@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__5f790dc5-82dc-4394-8f73-1a35bf8d6b5d__list_projects",
+      "mcp__5f790dc5-82dc-4394-8f73-1a35bf8d6b5d__get_project_url",
+      "mcp__5f790dc5-82dc-4394-8f73-1a35bf8d6b5d__get_publishable_keys",
+      "mcp__5f790dc5-82dc-4394-8f73-1a35bf8d6b5d__list_tables",
+      "mcp__5f790dc5-82dc-4394-8f73-1a35bf8d6b5d__apply_migration",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(pip3 install:*)"
+    ]
+  }
+}
