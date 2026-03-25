@@ -14,7 +14,7 @@ import StatusBadge from '../components/ui/StatusBadge'
 import Modal from '../components/ui/Modal'
 import clsx from 'clsx'
 import type { Supplier, PriceList, SupplierCriteria, SupplierCriteriaValue, SupplierTask } from '../types'
-import { SUPPLIER_STATUSES, SUPPLIER_CATEGORIES } from '../types'
+import { SUPPLIER_STATUSES } from '../types'
 
 const TABS = [
   { id: 'info', label: 'Информация', icon: User },
@@ -35,6 +35,7 @@ export default function SupplierDetail() {
   const [saving, setSaving] = useState(false)
 
   // Related data
+  const [dbCategories, setDbCategories] = useState<string[]>([])
   const [priceLists, setPriceLists] = useState<PriceList[]>([])
   const [criteria, setCriteria] = useState<SupplierCriteria[]>([])
   const [criteriaValues, setCriteriaValues] = useState<SupplierCriteriaValue[]>([])
@@ -51,12 +52,13 @@ export default function SupplierDetail() {
 
   async function loadAll() {
     if (!id) return
-    const [{ data: s }, { data: pl }, { data: cr }, { data: cv }, { data: ta }] = await Promise.all([
+    const [{ data: s }, { data: pl }, { data: cr }, { data: cv }, { data: ta }, { data: cats }] = await Promise.all([
       supabase.from('suppliers').select('*').eq('id', id).single(),
       supabase.from('price_lists').select('*').eq('supplier_id', id).order('created_at', { ascending: false }),
       supabase.from('supplier_criteria').select('*').order('sort_order'),
       supabase.from('supplier_criteria_values').select('*').eq('supplier_id', id),
       supabase.from('supplier_tasks').select('*').eq('supplier_id', id).order('created_at', { ascending: false }),
+      supabase.from('supplier_categories').select('name').order('name'),
     ])
     setSupplier(s as Supplier)
     setForm(s as Supplier)
@@ -64,6 +66,7 @@ export default function SupplierDetail() {
     setCriteria((cr ?? []) as SupplierCriteria[])
     setCriteriaValues((cv ?? []) as SupplierCriteriaValue[])
     setTasks((ta ?? []) as SupplierTask[])
+    setDbCategories((cats ?? []).map((c: { name: string }) => c.name))
     setLoading(false)
   }
 
@@ -201,7 +204,7 @@ export default function SupplierDetail() {
                 <label className="text-xs text-slate-500 mb-1 block">Категория</label>
                 <select value={form.category ?? ''} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="w-full bg-navy-700 border border-navy-500 text-white px-3 py-2 rounded-xl text-sm outline-none focus:border-primary-500">
                   <option value="">— Выберите —</option>
-                  {SUPPLIER_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {dbCategories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>

@@ -10,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/ui/StatusBadge'
 import Modal from '../components/ui/Modal'
 import type { Supplier } from '../types'
-import { SUPPLIER_STATUSES, SUPPLIER_CATEGORIES } from '../types'
+import { SUPPLIER_STATUSES } from '../types'
 import clsx from 'clsx'
 
 const emptyForm = { name: '', contact_person: '', email: '', phone: '', address: '', category: '', status: 'active' }
@@ -18,6 +18,7 @@ const emptyForm = { name: '', contact_person: '', email: '', phone: '', address:
 export default function Suppliers() {
   const { isAdmin } = useAuth()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [dbCategories, setDbCategories] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
@@ -28,8 +29,12 @@ export default function Suppliers() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
   async function load() {
-    const { data } = await supabase.from('suppliers').select('*').order('created_at', { ascending: false })
-    setSuppliers((data ?? []) as Supplier[])
+    const [{ data: sups }, { data: cats }] = await Promise.all([
+      supabase.from('suppliers').select('*').order('created_at', { ascending: false }),
+      supabase.from('supplier_categories').select('name').order('name'),
+    ])
+    setSuppliers((sups ?? []) as Supplier[])
+    setDbCategories((cats ?? []).map((c: { name: string }) => c.name))
     setLoading(false)
   }
 
@@ -211,7 +216,7 @@ export default function Suppliers() {
               <label className="block text-xs font-medium text-slate-400 mb-1.5">Категория</label>
               <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="w-full bg-navy-700 border border-navy-500 text-white px-4 py-2.5 rounded-xl focus:border-primary-500 outline-none transition-all text-sm">
                 <option value="">— Выберите —</option>
-                {SUPPLIER_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {dbCategories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
