@@ -60,7 +60,7 @@ export interface AcademicAttendance {
   room: string | null
   building: string | null
   notified_student: boolean
-  status: 'came' | 'didnt_come' | 'cancelled' | 'upcoming'
+  status: 'came' | 'didnt_come' | 'cancelled' | 'upcoming' | 'needs_update'
   comment: string | null
   created_at: string
 }
@@ -115,8 +115,9 @@ export const GRADE_STATUSES = [
 ] as const
 
 export const ATTENDANCE_STATUSES = [
-  { value: 'came',       label: '✅ Приехал',   color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  { value: 'didnt_come', label: '❌ Не приехал', color: 'text-red-400',     bg: 'bg-red-500/10' },
-  { value: 'cancelled',  label: '⚠️ Отмена',    color: 'text-amber-400',   bg: 'bg-amber-500/10' },
-  { value: 'upcoming',   label: '🔜 Предстоит', color: 'text-slate-400',   bg: 'bg-slate-500/10' },
+  { value: 'came',         label: '✅ Приехал',          color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  { value: 'didnt_come',   label: '❌ Не приехал',        color: 'text-red-400',     bg: 'bg-red-500/10' },
+  { value: 'cancelled',    label: '⚠️ Отмена',           color: 'text-amber-400',   bg: 'bg-amber-500/10' },
+  { value: 'upcoming',     label: '🔜 Предстоит',        color: 'text-slate-400',   bg: 'bg-slate-500/10' },
+  { value: 'needs_update', label: '🕐 Ждёт обновления',  color: 'text-orange-400',  bg: 'bg-orange-500/10' },
 ] as const

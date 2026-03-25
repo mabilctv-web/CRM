@@ -13,7 +13,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
-  updateProfile: (fullName: string) => Promise<{ error: Error | null }>
+  updateProfile: (data: string | { full_name?: string; first_name?: string; last_name?: string; patronymic?: string }) => Promise<{ error: Error | null }>
   updateEmail: (email: string) => Promise<{ error: Error | null }>
   updatePassword: (password: string) => Promise<{ error: Error | null }>
   refreshProfile: () => Promise<void>
@@ -87,13 +87,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
   }
 
-  async function updateProfile(fullName: string) {
+  async function updateProfile(data: string | { full_name?: string; first_name?: string; last_name?: string; patronymic?: string }) {
+    const payload = typeof data === 'string' ? { full_name: data } : data
     const { error } = await supabase
       .from('profiles')
-      .update({ full_name: fullName })
+      .update(payload)
       .eq('id', user!.id)
     if (!error) {
-      setProfile(prev => prev ? { ...prev, full_name: fullName } : prev)
+      setProfile(prev => prev ? { ...prev, ...payload } : prev)
     }
     return { error: error as Error | null }
   }

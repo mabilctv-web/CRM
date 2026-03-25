@@ -53,10 +53,12 @@ export default function Profile() {
   const { user, profile, isAdmin, updateProfile, updateEmail, updatePassword } = useAuth()
 
   // Name form
-  const [name, setName] = useState(profile?.full_name ?? '')
+  const [lastName,   setLastName]   = useState(profile?.last_name   ?? '')
+  const [firstName,  setFirstName]  = useState(profile?.first_name  ?? '')
+  const [patronymic, setPatronymic] = useState(profile?.patronymic  ?? '')
   const [nameSaving, setNameSaving] = useState(false)
-  const [nameSaved, setNameSaved] = useState(false)
-  const [nameError, setNameError] = useState('')
+  const [nameSaved,  setNameSaved]  = useState(false)
+  const [nameError,  setNameError]  = useState('')
 
   // Email form
   const [email, setEmail] = useState(user?.email ?? '')
@@ -74,7 +76,8 @@ export default function Profile() {
   const [pwSaved, setPwSaved] = useState(false)
   const [pwError, setPwError] = useState('')
 
-  const initials = (profile?.full_name ?? user?.email ?? 'U')
+  const displayName = [lastName, firstName, patronymic].filter(Boolean).join(' ') || profile?.full_name || ''
+  const initials = (displayName || user?.email || 'U')
     .split(' ')
     .map(w => w[0])
     .slice(0, 2)
@@ -83,10 +86,16 @@ export default function Profile() {
 
   async function handleNameSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim()) return
+    if (!lastName.trim() && !firstName.trim()) return
     setNameSaving(true)
     setNameError('')
-    const { error } = await updateProfile(name.trim())
+    const fullName = [lastName, firstName, patronymic].filter(s => s.trim()).join(' ').trim()
+    const { error } = await updateProfile({
+      last_name: lastName.trim() || undefined,
+      first_name: firstName.trim() || undefined,
+      patronymic: patronymic.trim() || undefined,
+      full_name: fullName,
+    })
     setNameSaving(false)
     if (error) {
       setNameError(error.message)
@@ -169,7 +178,7 @@ export default function Profile() {
           )}
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-white">{profile?.full_name ?? 'Профиль'}</h1>
+          <h1 className="text-2xl font-bold text-white">{displayName || 'Профиль'}</h1>
           <p className="text-sm text-slate-400 mt-0.5 flex items-center gap-1.5">
             {isAdmin
               ? <><Shield size={12} className="text-amber-400" /> Администратор</>
@@ -181,22 +190,42 @@ export default function Profile() {
 
       {/* Personal info */}
       <Section title="Личная информация" icon={User}>
-        <form onSubmit={handleNameSave} className="space-y-4">
+        <form onSubmit={handleNameSave} className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Полное имя</label>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">Фамилия *</label>
             <input
-              value={name}
-              onChange={e => { setName(e.target.value); setNameSaved(false) }}
-              placeholder="Иван Иванов"
+              value={lastName}
+              onChange={e => { setLastName(e.target.value); setNameSaved(false) }}
+              placeholder="Иванов"
               className="w-full bg-navy-700 border border-navy-500 text-white placeholder-slate-600 px-4 py-2.5 rounded-xl focus:border-primary-500 outline-none transition-all text-sm"
             />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">Имя *</label>
+              <input
+                value={firstName}
+                onChange={e => { setFirstName(e.target.value); setNameSaved(false) }}
+                placeholder="Михаил"
+                className="w-full bg-navy-700 border border-navy-500 text-white placeholder-slate-600 px-4 py-2.5 rounded-xl focus:border-primary-500 outline-none transition-all text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">Отчество</label>
+              <input
+                value={patronymic}
+                onChange={e => { setPatronymic(e.target.value); setNameSaved(false) }}
+                placeholder="Дмитриевич"
+                className="w-full bg-navy-700 border border-navy-500 text-white placeholder-slate-600 px-4 py-2.5 rounded-xl focus:border-primary-500 outline-none transition-all text-sm"
+              />
+            </div>
           </div>
           {nameError && (
             <p className="flex items-center gap-2 text-xs text-red-400">
               <AlertCircle size={13} /> {nameError}
             </p>
           )}
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-1">
             <SaveButton loading={nameSaving} saved={nameSaved} />
           </div>
         </form>

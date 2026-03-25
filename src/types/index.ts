@@ -16,6 +16,9 @@ export interface Profile {
   id: string
   role: UserRole
   full_name: string | null
+  first_name: string | null
+  last_name: string | null
+  patronymic: string | null
   created_at: string
   disabled: boolean
   permissions: UserPermissions

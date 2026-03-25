@@ -13,6 +13,7 @@ import {
   CreditCard,
   Users,
   Bell,
+  BellRing,
   Tag,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -26,6 +27,7 @@ const supplierAdminNav = [
 const studentAdminNav = [
   { to: '/admin/payment-contacts', icon: CreditCard, label: 'Реквизиты' },
   { to: '/admin/notifications', icon: Bell, label: 'Оповещения' },
+  { to: '/admin/admin-notifications', icon: BellRing, label: 'Адм. оповещения' },
 ]
 
 interface SidebarProps {
