@@ -51,6 +51,7 @@ export default function AdminNotifications() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [checking, setChecking] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -100,6 +101,12 @@ export default function AdminNotifications() {
     setTimeout(() => setLinkCopied(false), 2500)
   }
 
+  async function checkConnection() {
+    setChecking(true)
+    await load()
+    setChecking(false)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
@@ -146,37 +153,58 @@ export default function AdminNotifications() {
         <p className="text-xs text-slate-500 mb-4">
           Подключите Telegram для получения уведомлений о событиях в системе
         </p>
-        <div className="flex items-center gap-3">
-          <div className={clsx(
-            'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium flex-1',
-            isConnected
-              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-              : 'bg-navy-700 text-slate-500 border border-navy-500',
-          )}>
-            {isConnected ? (
-              <><CheckCircle size={14} /> Telegram подключён (ID: {settings.admin_telegram_chat_id})</>
-            ) : (
-              <><Bell size={14} /> Telegram не подключён</>
-            )}
-          </div>
+        <div className={clsx(
+          'flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium mb-3',
+          isConnected
+            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+            : 'bg-navy-700/50 text-slate-500 border border-navy-600',
+        )}>
+          {isConnected ? (
+            <><CheckCircle size={15} className="flex-shrink-0" /> Telegram подключён — chat_id: <code className="font-mono text-emerald-300">{settings.admin_telegram_chat_id}</code></>
+          ) : (
+            <><Bell size={15} className="flex-shrink-0" /> Telegram не подключён</>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {!isConnected && (
+            <button
+              onClick={copyLink}
+              className={clsx(
+                'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex-1',
+                linkCopied
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  : 'bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 border border-sky-500/20',
+              )}
+            >
+              {linkCopied
+                ? <><CheckCircle2 size={14} /> Ссылка скопирована!</>
+                : <><Send size={14} /> Скопировать ссылку для входа</>
+              }
+            </button>
+          )}
           <button
-            onClick={copyLink}
-            className={clsx(
-              'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex-shrink-0',
-              linkCopied
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                : 'bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 border border-sky-500/20',
-            )}
+            onClick={checkConnection}
+            disabled={checking}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/[0.08] text-slate-400 hover:text-white hover:border-white/20 flex-shrink-0"
           >
-            {linkCopied
-              ? <><CheckCircle2 size={14} /> Скопировано</>
-              : <><Send size={14} /> Ссылка для входа</>
+            {checking
+              ? <Loader2 size={14} className="animate-spin" />
+              : <CheckCircle2 size={14} />
             }
+            Проверить
           </button>
+          {isConnected && (
+            <button
+              onClick={() => setSettings(s => s ? { ...s, admin_telegram_chat_id: null } : s)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent"
+            >
+              Отключить
+            </button>
+          )}
         </div>
         {!isConnected && (
-          <p className="text-[11px] text-slate-600 mt-3">
-            Скопируйте ссылку и откройте её в Telegram. Бот сохранит ваш аккаунт как административный.
+          <p className="text-[11px] text-slate-600 mt-2.5">
+            1. Скопируйте ссылку выше → 2. Откройте в Telegram → 3. Нажмите «Start» → 4. Нажмите «Проверить» здесь
           </p>
         )}
       </motion.div>
