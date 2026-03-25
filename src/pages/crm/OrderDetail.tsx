@@ -3,28 +3,38 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { ArrowLeft, Send, Paperclip, MessageCircle, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Send, Paperclip, MessageCircle, ChevronDown, Globe } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 interface Order {
-  id: string; subject: string; university: string | null; description: string | null
-  deadline: string | null; status: string; created_at: string; client_email: string
+  id: string
+  subject: string
+  university: string | null
+  description: string | null
+  deadline: string | null
+  deadline_text: string | null
+  status: string
+  created_at: string
+  client_email: string | null
+  client_name: string | null
+  telegram_chat_id: string | null
+  source: string
 }
 interface OrderFile { id: string; file_name: string; file_url: string }
 interface Message { id: string; sender_type: string; message: string; created_at: string }
 
 const STATUS_OPTIONS = [
-  { value: 'new', label: 'Новая' },
+  { value: 'new',         label: 'Новая' },
   { value: 'in_progress', label: 'В работе' },
-  { value: 'done', label: 'Выполнена' },
-  { value: 'cancelled', label: 'Отменена' },
+  { value: 'done',        label: 'Выполнена' },
+  { value: 'cancelled',   label: 'Отменена' },
 ]
 
 const STATUS_COLOR: Record<string, string> = {
-  new: 'bg-cyan-500/15 text-cyan-400',
+  new:         'bg-cyan-500/15 text-cyan-400',
   in_progress: 'bg-amber-500/15 text-amber-400',
-  done: 'bg-emerald-500/15 text-emerald-400',
-  cancelled: 'bg-red-500/15 text-red-400',
+  done:        'bg-emerald-500/15 text-emerald-400',
+  cancelled:   'bg-red-500/15 text-red-400',
 }
 
 export default function CRMOrderDetail() {
@@ -86,6 +96,12 @@ export default function CRMOrderDetail() {
     </div>
   )
 
+  const isTelegram = order.source === 'telegram'
+  const clientDisplay = order.client_name || order.client_email || '—'
+  const deadlineDisplay = order.deadline
+    ? format(new Date(order.deadline), 'd MMMM yyyy', { locale: ru })
+    : order.deadline_text || null
+
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
@@ -98,9 +114,26 @@ export default function CRMOrderDetail() {
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl border border-white/[0.06] p-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-xl font-bold text-white">{order.subject}</h1>
-            {order.university && <p className="text-slate-400 text-sm mt-0.5">{order.university}</p>}
-            <p className="text-xs text-slate-500 mt-1">{order.client_email}</p>
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h1 className="text-xl font-bold text-white">{order.subject}</h1>
+              {/* Source badge */}
+              {isTelegram ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                  <Send size={11} /> Telegram
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-lg bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                  <Globe size={11} /> Сайт
+                </span>
+              )}
+            </div>
+            {order.university && <p className="text-slate-400 text-sm">{order.university}</p>}
+            <p className="text-xs text-slate-500 mt-1">{clientDisplay}</p>
+            {isTelegram && order.telegram_chat_id && (
+              <p className="text-xs text-sky-500/70 mt-0.5">
+                Telegram chat_id: <code className="font-mono">{order.telegram_chat_id}</code>
+              </p>
+            )}
           </div>
           {/* Status picker */}
           <div className="relative">
@@ -125,7 +158,7 @@ export default function CRMOrderDetail() {
         </div>
         {order.description && <p className="text-sm text-slate-300 mt-3 leading-relaxed">{order.description}</p>}
         <div className="flex gap-4 mt-3 text-xs text-slate-500 flex-wrap">
-          {order.deadline && <span>Дедлайн: {format(new Date(order.deadline), 'd MMMM yyyy', { locale: ru })}</span>}
+          {deadlineDisplay && <span>Дедлайн: {deadlineDisplay}</span>}
           <span>Создана: {format(new Date(order.created_at), 'd MMMM yyyy', { locale: ru })}</span>
         </div>
         {files.length > 0 && (
@@ -145,6 +178,11 @@ export default function CRMOrderDetail() {
         <div className="flex items-center gap-2 px-5 py-3 border-b border-white/[0.06]">
           <MessageCircle size={15} className="text-primary-400" />
           <span className="text-sm font-semibold text-white">Чат с клиентом</span>
+          {isTelegram && (
+            <span className="ml-auto text-[10px] text-sky-400/70 flex items-center gap-1">
+              <Send size={9} /> Ответы через CRM (не отправляются в Telegram автоматически)
+            </span>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px] max-h-[500px]">

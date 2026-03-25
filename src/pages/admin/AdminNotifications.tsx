@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Bell, BellRing, Save, Loader2, CheckCircle2, Send, CheckCircle,
-  BookOpen, Clock, CalendarCheck,
+  BookOpen, Clock, CalendarCheck, ShoppingBag,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import clsx from 'clsx'
@@ -13,6 +13,7 @@ interface AdminNotifSettings {
     new_assignment: boolean
     deadline_soon: boolean
     needs_attendance_status: boolean
+    new_order: boolean
   }
 }
 
@@ -43,6 +44,14 @@ const NOTIF_TYPES = [
     color: 'text-orange-400',
     bg: 'bg-orange-500/10',
   },
+  {
+    key: 'new_order' as const,
+    icon: ShoppingBag,
+    label: 'Новая заявка из Telegram',
+    desc: 'Уведомление при оформлении заявки через Telegram-бота',
+    color: 'text-sky-400',
+    bg: 'bg-sky-500/10',
+  },
 ]
 
 export default function AdminNotifications() {
@@ -69,6 +78,7 @@ export default function AdminNotifications() {
           new_assignment: false,
           deadline_soon: false,
           needs_attendance_status: false,
+          new_order: true,
         },
       })
     }

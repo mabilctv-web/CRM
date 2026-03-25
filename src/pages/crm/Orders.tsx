@@ -1,58 +1,112 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { PackageOpen, ChevronRight } from 'lucide-react'
+import { PackageOpen, ChevronRight, Globe, Send } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
 interface Order {
-  id: string; subject: string; university: string | null
-  client_email: string; status: string; deadline: string | null
-  created_at: string; _unread?: boolean
+  id: string
+  subject: string
+  university: string | null
+  client_email: string | null
+  client_name: string | null
+  source: string
+  status: string
+  deadline: string | null
+  deadline_text: string | null
+  created_at: string
 }
 
 const STATUS: Record<string, { label: string; color: string }> = {
-  new: { label: 'Новая', color: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20' },
+  new:         { label: 'Новая',    color: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20' },
   in_progress: { label: 'В работе', color: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  done: { label: 'Выполнена', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' },
-  cancelled: { label: 'Отменена', color: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  done:        { label: 'Выполнена', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' },
+  cancelled:   { label: 'Отменена', color: 'bg-red-500/15 text-red-400 border-red-500/20' },
+}
+
+function SourceBadge({ source }: { source: string }) {
+  if (source === 'telegram') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border bg-sky-500/10 text-sky-400 border-sky-500/20">
+        <Send size={9} /> Telegram
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-400 border-slate-500/20">
+      <Globe size={9} /> Сайт
+    </span>
+  )
 }
 
 export default function CRMOrders() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
+  const [sourceFilter, setSourceFilter] = useState<string>('all')
 
   useEffect(() => { load() }, [])
 
   async function load() {
-    const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false })
     setOrders((data ?? []) as Order[])
     setLoading(false)
   }
 
-  const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter)
+  const filtered = orders
+    .filter(o => filter === 'all' || o.status === filter)
+    .filter(o => sourceFilter === 'all' || o.source === sourceFilter)
+
+  const tgCount = orders.filter(o => o.source === 'telegram').length
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-white">Заказы</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Заявки от студентов</p>
+          <p className="text-sm text-slate-400 mt-0.5">
+            Заявки от клиентов
+            {tgCount > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 text-sky-400">
+                <Send size={11} /> {tgCount} из Telegram
+              </span>
+            )}
+          </p>
         </div>
-        <div className="flex items-center gap-1 bg-navy-700 rounded-xl p-1">
-          {[['all', 'Все'], ['new', 'Новые'], ['in_progress', 'В работе'], ['done', 'Готово']].map(([val, label]) => (
-            <button
-              key={val}
-              onClick={() => setFilter(val)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                filter === val ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Source filter */}
+          <div className="flex items-center gap-1 bg-navy-700 rounded-xl p-1">
+            {[['all', 'Все источники'], ['website', '🌐 Сайт'], ['telegram', '✈️ Telegram']].map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setSourceFilter(val)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  sourceFilter === val ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* Status filter */}
+          <div className="flex items-center gap-1 bg-navy-700 rounded-xl p-1">
+            {[['all', 'Все'], ['new', 'Новые'], ['in_progress', 'В работе'], ['done', 'Готово']].map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setFilter(val)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  filter === val ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -69,6 +123,11 @@ export default function CRMOrders() {
         <div className="space-y-3">
           {filtered.map((o, i) => {
             const s = STATUS[o.status] ?? STATUS.new
+            const clientLabel = o.client_name || o.client_email || '—'
+            const deadlineLabel = o.deadline
+              ? `До ${format(new Date(o.deadline), 'd MMM yyyy', { locale: ru })}`
+              : o.deadline_text || null
+
             return (
               <motion.div key={o.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                 <Link
@@ -79,14 +138,12 @@ export default function CRMOrders() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-white">{o.subject}</span>
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${s.color}`}>{s.label}</span>
-                      {o.status === 'new' && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary-500/20 text-primary-300">Новая</span>
-                      )}
+                      <SourceBadge source={o.source} />
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 flex-wrap">
-                      <span>{o.client_email}</span>
+                      <span>{clientLabel}</span>
                       {o.university && <span>{o.university}</span>}
-                      {o.deadline && <span>До {format(new Date(o.deadline), 'd MMM yyyy', { locale: ru })}</span>}
+                      {deadlineLabel && <span>{deadlineLabel}</span>}
                       <span>{format(new Date(o.created_at), 'd MMM yyyy', { locale: ru })}</span>
                     </div>
                   </div>
