@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Edit2, Save, X, Phone, Mail, MapPin, User, Calendar,
-  ExternalLink, Trash2, Plus, CheckSquare, Square, AlertTriangle,
-  PhoneCall, FileText, Link,
+  ExternalLink, Trash2, Plus, CheckSquare, Square,
+  FileText, Link,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
@@ -13,16 +13,14 @@ import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/ui/StatusBadge'
 import Modal from '../components/ui/Modal'
 import clsx from 'clsx'
-import type { Supplier, PriceList, SupplierCriteria, SupplierCriteriaValue, SupplierRisk, SupplierTask, SupplierCall } from '../types'
+import type { Supplier, PriceList, SupplierCriteria, SupplierCriteriaValue, SupplierTask } from '../types'
 import { SUPPLIER_STATUSES, SUPPLIER_CATEGORIES } from '../types'
 
 const TABS = [
   { id: 'info', label: 'Информация', icon: User },
   { id: 'criteria', label: 'Критерии', icon: FileText },
   { id: 'pricelists', label: 'Прайс-листы', icon: Link },
-  { id: 'risks', label: 'Риски', icon: AlertTriangle },
   { id: 'tasks', label: 'Задачи', icon: CheckSquare },
-  { id: 'calls', label: 'Звонки', icon: PhoneCall },
 ]
 
 export default function SupplierDetail() {
@@ -42,40 +40,30 @@ export default function SupplierDetail() {
   const [criteriaValues, setCriteriaValues] = useState<SupplierCriteriaValue[]>([])
   // Local drafts for text/number/date inputs — avoids DB write on every keystroke
   const [draftValues, setDraftValues] = useState<Record<number, string>>({})
-  const [risks, setRisks] = useState<SupplierRisk[]>([])
   const [tasks, setTasks] = useState<SupplierTask[]>([])
-  const [calls, setCalls] = useState<SupplierCall[]>([])
 
   // Modals
-  const [riskModal, setRiskModal] = useState(false)
   const [taskModal, setTaskModal] = useState(false)
-  const [callModal, setCallModal] = useState(false)
-  const [riskText, setRiskText] = useState('')
   const [taskForm, setTaskForm] = useState({ title: '', deadline: '' })
-  const [callForm, setCallForm] = useState({ call_date: '', summary: '', result: '' })
 
   const [linkModal, setLinkModal] = useState(false)
   const [linkForm, setLinkForm] = useState({ file_name: '', url: '' })
 
   async function loadAll() {
     if (!id) return
-    const [{ data: s }, { data: pl }, { data: cr }, { data: cv }, { data: ri }, { data: ta }, { data: ca }] = await Promise.all([
+    const [{ data: s }, { data: pl }, { data: cr }, { data: cv }, { data: ta }] = await Promise.all([
       supabase.from('suppliers').select('*').eq('id', id).single(),
       supabase.from('price_lists').select('*').eq('supplier_id', id).order('created_at', { ascending: false }),
       supabase.from('supplier_criteria').select('*').order('sort_order'),
       supabase.from('supplier_criteria_values').select('*').eq('supplier_id', id),
-      supabase.from('supplier_risks').select('*').eq('supplier_id', id).order('created_at', { ascending: false }),
       supabase.from('supplier_tasks').select('*').eq('supplier_id', id).order('created_at', { ascending: false }),
-      supabase.from('supplier_calls').select('*').eq('supplier_id', id).order('call_date', { ascending: false }),
     ])
     setSupplier(s as Supplier)
     setForm(s as Supplier)
     setPriceLists((pl ?? []) as PriceList[])
     setCriteria((cr ?? []) as SupplierCriteria[])
     setCriteriaValues((cv ?? []) as SupplierCriteriaValue[])
-    setRisks((ri ?? []) as SupplierRisk[])
     setTasks((ta ?? []) as SupplierTask[])
-    setCalls((ca ?? []) as SupplierCall[])
     setLoading(false)
   }
 
@@ -118,14 +106,6 @@ export default function SupplierDetail() {
     }
   }
 
-  async function addRisk() {
-    if (!riskText.trim() || !id) return
-    const { data } = await supabase.from('supplier_risks').insert({ supplier_id: Number(id), text: riskText }).select().single()
-    if (data) setRisks(prev => [data as SupplierRisk, ...prev])
-    setRiskText('')
-    setRiskModal(false)
-  }
-
   async function addTask() {
     if (!taskForm.title.trim() || !id) return
     const { data } = await supabase.from('supplier_tasks').insert({ supplier_id: Number(id), ...taskForm, deadline: taskForm.deadline || null }).select().single()
@@ -137,14 +117,6 @@ export default function SupplierDetail() {
   async function toggleTask(t: SupplierTask) {
     await supabase.from('supplier_tasks').update({ done: !t.done }).eq('id', t.id)
     setTasks(prev => prev.map(x => x.id === t.id ? { ...x, done: !t.done } : x))
-  }
-
-  async function addCall() {
-    if (!callForm.call_date || !id) return
-    const { data } = await supabase.from('supplier_calls').insert({ supplier_id: Number(id), ...callForm, summary: callForm.summary || null, result: callForm.result || null }).select().single()
-    if (data) setCalls(prev => [data as SupplierCall, ...prev])
-    setCallForm({ call_date: '', summary: '', result: '' })
-    setCallModal(false)
   }
 
   function getCriteriaValue(criteriaId: number) {
@@ -417,37 +389,6 @@ export default function SupplierDetail() {
             </div>
           )}
 
-          {/* RISKS */}
-          {tab === 'risks' && (
-            <div className="space-y-4">
-              {isAdmin && (
-                <button onClick={() => setRiskModal(true)} className="flex items-center gap-2 btn-secondary text-sm">
-                  <Plus size={14} /> Добавить риск
-                </button>
-              )}
-              {risks.length === 0 ? (
-                <div className="text-center py-8 text-slate-500 text-sm">
-                  <AlertTriangle size={32} className="mx-auto mb-2 opacity-30" /> Рисков нет
-                </div>
-              ) : (
-                risks.map(r => (
-                  <div key={r.id} className="flex gap-3 p-4 bg-red-500/5 border border-red-500/15 rounded-xl">
-                    <AlertTriangle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm text-slate-200">{r.text}</p>
-                      <p className="text-xs text-slate-600 mt-1">{format(new Date(r.created_at), 'd MMM yyyy', { locale: ru })}</p>
-                    </div>
-                    {isAdmin && (
-                      <button onClick={async () => { await supabase.from('supplier_risks').delete().eq('id', r.id); setRisks(p => p.filter(x => x.id !== r.id)) }} className="p-1.5 text-slate-600 hover:text-red-400 transition-colors">
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
           {/* TASKS */}
           {tab === 'tasks' && (
             <div className="space-y-4">
@@ -481,36 +422,6 @@ export default function SupplierDetail() {
             </div>
           )}
 
-          {/* CALLS */}
-          {tab === 'calls' && (
-            <div className="space-y-4">
-              {isAdmin && (
-                <button onClick={() => setCallModal(true)} className="flex items-center gap-2 btn-secondary text-sm">
-                  <Plus size={14} /> Добавить звонок
-                </button>
-              )}
-              {calls.length === 0 ? (
-                <div className="text-center py-8 text-slate-500 text-sm">
-                  <PhoneCall size={32} className="mx-auto mb-2 opacity-30" /> Звонков нет
-                </div>
-              ) : (
-                calls.map(c => (
-                  <div key={c.id} className="p-4 bg-navy-700/50 border border-white/[0.05] rounded-xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-cyan-400 flex items-center gap-1.5"><PhoneCall size={12} /> {format(new Date(c.call_date), 'd MMM yyyy HH:mm', { locale: ru })}</span>
-                      {isAdmin && (
-                        <button onClick={async () => { await supabase.from('supplier_calls').delete().eq('id', c.id); setCalls(p => p.filter(x => x.id !== c.id)) }} className="p-1 text-slate-600 hover:text-red-400 transition-colors">
-                          <X size={13} />
-                        </button>
-                      )}
-                    </div>
-                    {c.summary && <p className="text-sm text-slate-300">{c.summary}</p>}
-                    {c.result && <p className="text-xs text-slate-500 bg-navy-600/50 rounded-lg px-3 py-1.5">Результат: {c.result}</p>}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
         </motion.div>
       </AnimatePresence>
 
@@ -532,15 +443,6 @@ export default function SupplierDetail() {
         </div>
       </Modal>
 
-      {/* Risk modal */}
-      <Modal open={riskModal} onClose={() => setRiskModal(false)} title="Добавить риск" maxWidth="max-w-md">
-        <textarea value={riskText} onChange={e => setRiskText(e.target.value)} placeholder="Описание риска..." rows={4} className="w-full bg-navy-700 border border-navy-500 text-white placeholder-slate-600 px-4 py-3 rounded-xl focus:border-primary-500 outline-none transition-all text-sm resize-none mb-4" />
-        <div className="flex gap-3">
-          <button onClick={() => setRiskModal(false)} className="flex-1 btn-secondary text-sm">Отмена</button>
-          <button onClick={addRisk} disabled={!riskText.trim()} className="flex-1 btn-primary text-sm">Добавить</button>
-        </div>
-      </Modal>
-
       {/* Task modal */}
       <Modal open={taskModal} onClose={() => setTaskModal(false)} title="Добавить задачу" maxWidth="max-w-md">
         <div className="space-y-4 mb-4">
@@ -556,21 +458,6 @@ export default function SupplierDetail() {
         </div>
       </Modal>
 
-      {/* Call modal */}
-      <Modal open={callModal} onClose={() => setCallModal(false)} title="Добавить звонок" maxWidth="max-w-md">
-        <div className="space-y-4 mb-4">
-          <div>
-            <label className="text-xs text-slate-500 mb-1.5 block">Дата и время *</label>
-            <input type="datetime-local" value={callForm.call_date} onChange={e => setCallForm(f => ({ ...f, call_date: e.target.value }))} className="bg-navy-700 border border-navy-500 text-white px-4 py-2.5 rounded-xl focus:border-primary-500 outline-none transition-all text-sm" />
-          </div>
-          <textarea value={callForm.summary} onChange={e => setCallForm(f => ({ ...f, summary: e.target.value }))} placeholder="Краткое описание разговора..." rows={3} className="w-full bg-navy-700 border border-navy-500 text-white placeholder-slate-600 px-4 py-3 rounded-xl focus:border-primary-500 outline-none transition-all text-sm resize-none" />
-          <input value={callForm.result} onChange={e => setCallForm(f => ({ ...f, result: e.target.value }))} placeholder="Результат звонка" className="w-full bg-navy-700 border border-navy-500 text-white placeholder-slate-600 px-4 py-2.5 rounded-xl focus:border-primary-500 outline-none transition-all text-sm" />
-        </div>
-        <div className="flex gap-3">
-          <button onClick={() => setCallModal(false)} className="flex-1 btn-secondary text-sm">Отмена</button>
-          <button onClick={addCall} disabled={!callForm.call_date} className="flex-1 btn-primary text-sm">Добавить</button>
-        </div>
-      </Modal>
     </div>
   )
 }

@@ -13,13 +13,17 @@ import {
   CreditCard,
   Users,
   Bell,
+  Tag,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../contexts/AuthContext'
 
-const adminNav = [
-  { to: '/admin/users', icon: Users, label: 'Пользователи' },
+const supplierAdminNav = [
   { to: '/admin/criteria', icon: ListChecks, label: 'Критерии' },
+  { to: '/admin/categories', icon: Tag, label: 'Категории' },
+]
+
+const studentAdminNav = [
   { to: '/admin/payment-contacts', icon: CreditCard, label: 'Реквизиты' },
   { to: '/admin/notifications', icon: Bell, label: 'Оповещения' },
 ]
@@ -75,7 +79,19 @@ export default function Sidebar({ collapsed }: SidebarProps) {
               )}
               {collapsed && <div className="w-full h-px bg-white/[0.07]" />}
             </div>
-            {adminNav.map(({ to, icon: Icon, label }) => (
+            <NavItem to="/admin/users" icon={Users} label="Пользователи" collapsed={collapsed} active={location.pathname === '/admin/users'} />
+            {!collapsed && (
+              <p className="text-[9px] font-semibold text-slate-600 uppercase tracking-widest px-3 pt-3 pb-1">Поставщики</p>
+            )}
+            {collapsed && <div className="my-1 mx-2 h-px bg-white/[0.04]" />}
+            {supplierAdminNav.map(({ to, icon: Icon, label }) => (
+              <NavItem key={to} to={to} icon={Icon} label={label} collapsed={collapsed} active={location.pathname === to} />
+            ))}
+            {!collapsed && (
+              <p className="text-[9px] font-semibold text-slate-600 uppercase tracking-widest px-3 pt-3 pb-1">Студенты</p>
+            )}
+            {collapsed && <div className="my-1 mx-2 h-px bg-white/[0.04]" />}
+            {studentAdminNav.map(({ to, icon: Icon, label }) => (
               <NavItem key={to} to={to} icon={Icon} label={label} collapsed={collapsed} active={location.pathname === to} />
             ))}
           </>

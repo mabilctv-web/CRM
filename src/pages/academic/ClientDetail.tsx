@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, GraduationCap, BookOpen, CalendarCheck, AlertTriangle, Wallet, Edit2, Shield, Library, CalendarDays, Send, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, GraduationCap, BookOpen, CalendarCheck, AlertTriangle, Wallet, Edit2, Shield, Library, CalendarDays, Send, CheckCircle2, Bell, BellRing } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import type { AcademicClient, AcademicSubject } from '../../types/academic'
@@ -60,6 +60,24 @@ export default function ClientDetail() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [tgCopied, setTgCopied] = useState(false)
+  const [testNotifSending, setTestNotifSending] = useState(false)
+  const [testNotifResult, setTestNotifResult] = useState<'success' | 'error' | null>(null)
+
+  async function sendTestNotification() {
+    if (!client?.telegram_chat_id) return
+    setTestNotifSending(true)
+    setTestNotifResult(null)
+    try {
+      const { error } = await supabase.functions.invoke('send-reminders', {
+        body: { test: true, chat_id: client.telegram_chat_id, client_name: fullName(client) },
+      })
+      setTestNotifResult(error ? 'error' : 'success')
+    } catch {
+      setTestNotifResult('error')
+    }
+    setTestNotifSending(false)
+    setTimeout(() => setTestNotifResult(null), 4000)
+  }
 
   function copyTelegramLink() {
     const link = `https://t.me/studyDB_bot?start=client_${clientId}`
@@ -171,9 +189,32 @@ export default function ClientDetail() {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {client.telegram_chat_id ? (
-            <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-emerald-400 bg-emerald-500/10 text-xs font-medium">
-              <CheckCircle2 size={13} /> Telegram
-            </span>
+            <>
+              <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-emerald-400 bg-emerald-500/10 text-xs font-medium">
+                <CheckCircle2 size={13} /> Telegram
+              </span>
+              <button
+                onClick={sendTestNotification}
+                disabled={testNotifSending}
+                title="Отправить тестовое уведомление"
+                className={clsx(
+                  'flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all text-xs flex-shrink-0',
+                  testNotifResult === 'success' ? 'text-emerald-400 bg-emerald-500/10' :
+                  testNotifResult === 'error' ? 'text-red-400 bg-red-500/10' :
+                  'text-slate-400 hover:text-violet-400 hover:bg-violet-500/10',
+                )}
+              >
+                {testNotifSending ? (
+                  <div className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                ) : testNotifResult === 'success' ? (
+                  <><CheckCircle2 size={13} /> <span>Отправлено!</span></>
+                ) : testNotifResult === 'error' ? (
+                  <><BellRing size={13} /> <span>Ошибка</span></>
+                ) : (
+                  <><Bell size={13} /> <span>Тест</span></>
+                )}
+              </button>
+            </>
           ) : (
             <button onClick={copyTelegramLink}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 transition-all text-sm flex-shrink-0">

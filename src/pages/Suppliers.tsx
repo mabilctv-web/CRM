@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Building2, Search, Plus, Phone, Mail, MapPin,
-  Edit2, Trash2, ChevronRight, X, Check, SlidersHorizontal,
+  Edit2, Trash2, ChevronRight, X, Check, Tag,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -20,7 +20,7 @@ export default function Suppliers() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterCategory, setFilterCategory] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -72,12 +72,28 @@ export default function Suppliers() {
     setSuppliers(prev => prev.map(x => x.id === s.id ? { ...x, status: next } : x))
   }
 
+  const categories = useMemo(() => {
+    const cats = [...new Set(suppliers.map(s => s.category).filter(Boolean) as string[])]
+    return cats.sort()
+  }, [suppliers])
+
   const filtered = suppliers.filter(s => {
     const q = search.toLowerCase()
     const matchSearch = !q || s.name.toLowerCase().includes(q) || (s.category ?? '').toLowerCase().includes(q) || (s.contact_person ?? '').toLowerCase().includes(q)
-    const matchStatus = filterStatus === 'all' || s.status === filterStatus
-    return matchSearch && matchStatus
+    const matchCat = filterCategory === 'all' || s.category === filterCategory
+    return matchSearch && matchCat
   })
+
+  const grouped = useMemo(() => {
+    if (filterCategory !== 'all' || search) return null
+    const result: Record<string, Supplier[]> = {}
+    for (const s of filtered) {
+      const cat = s.category ?? 'Без категории'
+      if (!result[cat]) result[cat] = []
+      result[cat].push(s)
+    }
+    return result
+  }, [filtered, filterCategory, search])
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -116,19 +132,19 @@ export default function Suppliers() {
           )}
         </div>
         <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
-          <SlidersHorizontal size={14} className="text-slate-500 flex-shrink-0" />
-          {[{ value: 'all', label: 'Все' }, ...SUPPLIER_STATUSES].map(s => (
+          <Tag size={14} className="text-slate-500 flex-shrink-0" />
+          {[{ value: 'all', label: 'Все' }, ...categories.map(c => ({ value: c, label: c }))].map(c => (
             <button
-              key={s.value}
-              onClick={() => setFilterStatus(s.value)}
+              key={c.value}
+              onClick={() => setFilterCategory(c.value)}
               className={clsx(
                 'text-xs font-medium px-3 py-1.5 rounded-lg whitespace-nowrap transition-all',
-                filterStatus === s.value
+                filterCategory === c.value
                   ? 'bg-primary-600/30 text-primary-300 border border-primary-500/30'
                   : 'text-slate-400 hover:text-slate-200 border border-transparent hover:border-white/10',
               )}
             >
-              {s.label}
+              {c.label}
             </button>
           ))}
         </div>
@@ -153,107 +169,22 @@ export default function Suppliers() {
           <p className="text-slate-400 font-medium">Поставщики не найдены</p>
           <p className="text-slate-600 text-sm mt-1">Попробуйте изменить параметры поиска</p>
         </div>
+      ) : grouped ? (
+        <div className="space-y-8">
+          {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b, 'ru')).map(([cat, items]) => (
+            <div key={cat}>
+              <div className="flex items-center gap-2 mb-4">
+                <Tag size={14} className="text-cyan-400" />
+                <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider">{cat}</h2>
+                <span className="text-xs text-slate-600 ml-1">{items.length}</span>
+                <div className="flex-1 h-px bg-white/[0.06] ml-2" />
+              </div>
+              <SupplierGrid items={items} isAdmin={isAdmin} onEdit={openEdit} onDelete={id => setDeleteId(id)} onToggle={toggleStatus} />
+            </div>
+          ))}
+        </div>
       ) : (
-        <motion.div
-          layout
-          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
-        >
-          <AnimatePresence mode="popLayout">
-            {filtered.map(s => (
-              <motion.div
-                key={s.id}
-                layout
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-                className="glass rounded-2xl border border-white/[0.06] hover:border-white/[0.12] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover group overflow-hidden"
-              >
-                {/* Top accent */}
-                <div className="h-[2px] w-full bg-gradient-to-r from-primary-600/60 via-cyan-500/40 to-transparent" />
-
-                <div className="p-5">
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-primary-600/20 flex items-center justify-center text-primary-400 font-bold text-base flex-shrink-0">
-                      {s.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-white text-sm truncate">{s.name}</h3>
-                      <p className="text-xs text-slate-500 truncate">{s.category ?? 'Без категории'}</p>
-                    </div>
-                    <StatusBadge status={s.status} />
-                  </div>
-
-                  <div className="space-y-2 mb-4">
-                    {s.contact_person && (
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <div className="w-4 h-4 rounded bg-white/[0.05] flex items-center justify-center flex-shrink-0">
-                          <span className="text-[9px]">👤</span>
-                        </div>
-                        <span className="truncate">{s.contact_person}</span>
-                      </div>
-                    )}
-                    {s.phone && (
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <Phone size={12} className="flex-shrink-0 text-slate-600" />
-                        <span>{s.phone}</span>
-                      </div>
-                    )}
-                    {s.email && (
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <Mail size={12} className="flex-shrink-0 text-slate-600" />
-                        <span className="truncate">{s.email}</span>
-                      </div>
-                    )}
-                    {s.address && (
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <MapPin size={12} className="flex-shrink-0 text-slate-600" />
-                        <span className="truncate">{s.address}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-3 border-t border-white/[0.06]">
-                    <Link
-                      to={`/suppliers/${s.id}`}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] py-2 rounded-lg transition-all"
-                    >
-                      Подробнее <ChevronRight size={12} />
-                    </Link>
-                    {isAdmin && (
-                      <>
-                        <button
-                          onClick={() => toggleStatus(s)}
-                          title={s.status === 'active' ? 'Деактивировать' : 'Активировать'}
-                          className={clsx(
-                            'p-2 rounded-lg transition-all',
-                            s.status === 'active'
-                              ? 'text-emerald-400 hover:bg-emerald-500/10'
-                              : 'text-slate-500 hover:bg-white/[0.05]',
-                          )}
-                        >
-                          <Check size={14} />
-                        </button>
-                        <button
-                          onClick={() => openEdit(s)}
-                          className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => setDeleteId(s.id)}
-                          className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
+        <SupplierGrid items={filtered} isAdmin={isAdmin} onEdit={openEdit} onDelete={id => setDeleteId(id)} onToggle={toggleStatus} />
       )}
 
       {/* Add/Edit modal */}
@@ -313,5 +244,98 @@ export default function Suppliers() {
         </div>
       </Modal>
     </div>
+  )
+}
+
+function SupplierGrid({ items, isAdmin, onEdit, onDelete, onToggle }: {
+  items: Supplier[]
+  isAdmin: boolean
+  onEdit: (s: Supplier) => void
+  onDelete: (id: number) => void
+  onToggle: (s: Supplier) => void
+}) {
+  return (
+    <motion.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <AnimatePresence mode="popLayout">
+        {items.map(s => (
+          <motion.div
+            key={s.id}
+            layout
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="glass rounded-2xl border border-white/[0.06] hover:border-white/[0.12] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover group overflow-hidden"
+          >
+            <div className="h-[2px] w-full bg-gradient-to-r from-primary-600/60 via-cyan-500/40 to-transparent" />
+            <div className="p-5">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-primary-600/20 flex items-center justify-center text-primary-400 font-bold text-base flex-shrink-0">
+                  {s.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-white text-sm truncate">{s.name}</h3>
+                  <p className="text-xs text-slate-500 truncate">{s.category ?? 'Без категории'}</p>
+                </div>
+                <StatusBadge status={s.status} />
+              </div>
+              <div className="space-y-2 mb-4">
+                {s.contact_person && (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <div className="w-4 h-4 rounded bg-white/[0.05] flex items-center justify-center flex-shrink-0">
+                      <span className="text-[9px]">👤</span>
+                    </div>
+                    <span className="truncate">{s.contact_person}</span>
+                  </div>
+                )}
+                {s.phone && (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Phone size={12} className="flex-shrink-0 text-slate-600" />
+                    <span>{s.phone}</span>
+                  </div>
+                )}
+                {s.email && (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Mail size={12} className="flex-shrink-0 text-slate-600" />
+                    <span className="truncate">{s.email}</span>
+                  </div>
+                )}
+                {s.address && (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <MapPin size={12} className="flex-shrink-0 text-slate-600" />
+                    <span className="truncate">{s.address}</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 pt-3 border-t border-white/[0.06]">
+                <Link
+                  to={`/suppliers/${s.id}`}
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] py-2 rounded-lg transition-all"
+                >
+                  Подробнее <ChevronRight size={12} />
+                </Link>
+                {isAdmin && (
+                  <>
+                    <button
+                      onClick={() => onToggle(s)}
+                      title={s.status === 'active' ? 'Деактивировать' : 'Активировать'}
+                      className={clsx('p-2 rounded-lg transition-all', s.status === 'active' ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-slate-500 hover:bg-white/[0.05]')}
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button onClick={() => onEdit(s)} className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all">
+                      <Edit2 size={14} />
+                    </button>
+                    <button onClick={() => onDelete(s.id)} className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </motion.div>
   )
 }

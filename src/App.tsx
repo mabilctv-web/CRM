@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard'
 import Suppliers from './pages/Suppliers'
 import SupplierDetail from './pages/SupplierDetail'
 import Criteria from './pages/admin/Criteria'
+import SupplierCategories from './pages/admin/SupplierCategories'
 import PaymentContacts from './pages/admin/PaymentContacts'
 import UsersAdmin from './pages/admin/Users'
 import NotificationSettings from './pages/admin/NotificationSettings'
@@ -50,6 +51,7 @@ export default function App() {
               <Route path="/crm/orders/:id" element={<CRMOrderDetail />} />
               <Route element={<ProtectedRoute adminOnly />}>
                 <Route path="/admin/criteria" element={<Criteria />} />
+                <Route path="/admin/categories" element={<SupplierCategories />} />
                 <Route path="/admin/payment-contacts" element={<PaymentContacts />} />
                 <Route path="/admin/users" element={<UsersAdmin />} />
                 <Route path="/admin/notifications" element={<NotificationSettings />} />
