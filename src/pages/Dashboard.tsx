@@ -196,7 +196,7 @@ export default function Dashboard() {
       <motion.div variants={item} className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">
-            {greeting()}, <span className="bg-gradient-to-r from-primary-400 to-cyan-400 bg-clip-text text-transparent">{profile?.full_name?.split(' ')[0] ?? 'Пользователь'}</span>
+            {greeting()}, <span className="bg-gradient-to-r from-primary-400 to-cyan-400 bg-clip-text text-transparent">{profile?.full_name?.split(' ')[1] ?? profile?.full_name?.split(' ')[0] ?? 'Пользователь'}</span>
           </h1>
           <p className="text-slate-400 text-sm mt-1">{format(new Date(), "EEEE, d MMMM yyyy", { locale: ru })}</p>
         </div>

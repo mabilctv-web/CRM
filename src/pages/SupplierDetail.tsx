@@ -324,7 +324,6 @@ export default function SupplierDetail() {
                       <label className="text-xs text-slate-500 mb-1.5 flex items-center gap-1.5">
                         {c.name}
                         {c.required && <span className="text-red-400">*</span>}
-                        <span className="bg-navy-600 text-slate-500 px-1.5 py-0.5 rounded text-[10px]">{c.field_type}</span>
                       </label>
                       {isAdmin ? (
                         c.field_type === 'boolean' ? (
@@ -361,7 +360,11 @@ export default function SupplierDetail() {
                         )
                       ) : (
                         <p className="text-sm text-white">
-                          {getCriteriaValue(c.id) || <span className="text-slate-600 italic">Не заполнено</span>}
+                          {c.field_type === 'boolean'
+                            ? getCriteriaValue(c.id) === 'true' ? <span className="text-emerald-400 font-medium">Да</span>
+                              : getCriteriaValue(c.id) === 'false' ? <span className="text-red-400 font-medium">Нет</span>
+                              : <span className="text-slate-600 italic">Не заполнено</span>
+                            : getCriteriaValue(c.id) || <span className="text-slate-600 italic">Не заполнено</span>}
                         </p>
                       )}
                     </div>
@@ -387,26 +390,26 @@ export default function SupplierDetail() {
               ) : (
                 <div className="space-y-2">
                   {priceLists.map(pl => (
-                    <div key={pl.id} className="flex items-center gap-4 p-3.5 bg-navy-700/50 rounded-xl border border-white/[0.05] hover:border-white/10 transition-all">
+                    <div key={pl.id} className="flex items-center gap-4 p-3.5 bg-navy-700/50 rounded-xl border border-white/[0.05] hover:border-primary-500/30 transition-all group">
                       <div className="w-9 h-9 rounded-lg bg-primary-600/20 flex items-center justify-center flex-shrink-0">
                         <Link size={16} className="text-primary-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">{pl.file_name}</p>
-                        <p className="text-xs text-slate-500 truncate">{pl.url}</p>
-                      </div>
-                      <div className="flex gap-1">
-                        {pl.url && (
-                          <a href={pl.url} target="_blank" rel="noopener noreferrer" className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-all" title="Открыть">
-                            <ExternalLink size={14} />
+                        {pl.url ? (
+                          <a href={pl.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary-400 hover:text-primary-300 truncate flex items-center gap-1.5 transition-colors">
+                            {pl.file_name}
+                            <ExternalLink size={12} className="flex-shrink-0 opacity-60" />
                           </a>
+                        ) : (
+                          <p className="text-sm font-medium text-white truncate">{pl.file_name}</p>
                         )}
-                        {isAdmin && (
-                          <button onClick={() => deleteLink(pl)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all" title="Удалить">
-                            <Trash2 size={14} />
-                          </button>
-                        )}
+                        <p className="text-xs text-slate-600 truncate mt-0.5">{pl.url}</p>
                       </div>
+                      {isAdmin && (
+                        <button onClick={() => deleteLink(pl)} className="p-2 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
