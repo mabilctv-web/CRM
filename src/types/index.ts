@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'user'
+export type UserRole = 'admin' | 'user' | 'client'
 
 export interface UserPermissions {
   suppliers: boolean
@@ -7,8 +7,8 @@ export interface UserPermissions {
 }
 
 export const DEFAULT_PERMISSIONS: UserPermissions = {
-  suppliers: true,
-  academic: true,
+  suppliers: false,
+  academic: false,
   academic_clients: [],
 }
 

@@ -65,7 +65,6 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         {canAccess('academic') && (
           <NavItem to="/academic/clients" icon={GraduationCap} label="Учебные услуги" collapsed={collapsed} active={location.pathname.startsWith('/academic')} />
         )}
-
         {isAdmin && (
           <>
             <div className={clsx('my-3 flex items-center gap-2', collapsed ? 'px-2' : 'px-3')}>

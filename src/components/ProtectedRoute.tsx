@@ -23,6 +23,9 @@ export default function ProtectedRoute({ adminOnly = false, section }: Props) {
 
   if (!user) return <Navigate to="/login" replace />
 
+  // Redirect client-role users to their portal
+  if (profile?.role === 'client') return <Navigate to="/my" replace />
+
   // Block disabled accounts
   if (profile?.disabled) {
     return (

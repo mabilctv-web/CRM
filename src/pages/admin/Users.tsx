@@ -12,45 +12,40 @@ import type { UserPermissions } from '../../types'
 import type { AcademicClient } from '../../types/academic'
 import clsx from 'clsx'
 
-const EDGE_FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-manage-users`
-
 interface AdminUser {
   id: string
   email: string
   full_name: string | null
-  role: 'admin' | 'user'
+  role: 'admin' | 'user' | 'client'
   disabled: boolean
   permissions: UserPermissions
+  password_plain: string | null
   created_at: string
   last_sign_in_at: string | null
 }
 
-const defaultPerms: UserPermissions = { suppliers: true, academic: true, academic_clients: [] }
+const defaultPerms: UserPermissions = { suppliers: false, academic: false, academic_clients: [] }
 
-async function callEdgeFn(body: Record<string, unknown>, token: string) {
-  const res = await fetch(EDGE_FN, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-  })
-  return res.json()
+async function callEdgeFn(body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke('admin-manage-users', { body })
+  if (error) return { error: error.message }
+  return data ?? {}
 }
 
 export default function UsersAdmin() {
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [tab, setTab] = useState<'crm' | 'landing'>('crm')
   const [academicClients, setAcademicClients] = useState<AcademicClient[]>([])
   const [loading, setLoading] = useState(true)
   const [editUser, setEditUser] = useState<AdminUser | null>(null)
-  const [editForm, setEditForm] = useState({ full_name: '', role: 'user' as 'admin' | 'user', disabled: false, permissions: defaultPerms })
+  const [editForm, setEditForm] = useState({ full_name: '', role: 'user' as 'admin' | 'user' | 'client', disabled: false, permissions: defaultPerms })
   const [showClientsExpanded, setShowClientsExpanded] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [newPassword, setNewPassword] = useState('')
   const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [passwordSaving, setPasswordSaving] = useState(false)
   const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState(false)
@@ -87,6 +82,7 @@ export default function UsersAdmin() {
     setShowClientsExpanded(false)
     setNewPassword('')
     setShowNewPassword(false)
+    setShowCurrentPassword(false)
     setPasswordError('')
     setPasswordSuccess(false)
   }
@@ -118,15 +114,11 @@ export default function UsersAdmin() {
       })
       .eq('id', editUser.id)
 
-    if (!error) {
-      setUsers(prev => prev.map(u =>
-        u.id === editUser.id
-          ? { ...u, full_name: editForm.full_name || null, role: editForm.role, disabled: editForm.disabled, permissions: editForm.permissions }
-          : u
-      ))
-      setEditUser(null)
-    }
     setSaving(false)
+    if (!error) {
+      setEditUser(null)
+      await load()
+    }
   }
 
   async function handlePasswordSave() {
@@ -134,14 +126,18 @@ export default function UsersAdmin() {
     setPasswordSaving(true)
     setPasswordError('')
     setPasswordSuccess(false)
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token ?? ''
-    const result = await callEdgeFn({ action: 'update_password', user_id: editUser.id, password: newPassword }, token)
-    if (result.error) {
-      setPasswordError(result.error)
+    const { error: rpcError } = await supabase.rpc('admin_update_password', {
+      target_user_id: editUser.id,
+      new_password: newPassword,
+    })
+    if (rpcError) {
+      setPasswordError(rpcError.message)
     } else {
       setPasswordSuccess(true)
       setNewPassword('')
+      // Update local editUser so current password shows immediately
+      setEditUser(u => u ? { ...u, password_plain: newPassword } : u)
+      setUsers(prev => prev.map(u => u.id === editUser.id ? { ...u, password_plain: newPassword } : u))
       setTimeout(() => setPasswordSuccess(false), 3000)
     }
     setPasswordSaving(false)
@@ -150,17 +146,13 @@ export default function UsersAdmin() {
   async function handleCreate() {
     setCreating(true)
     setCreateError('')
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token ?? ''
-    const result = await callEdgeFn({
-      action: 'create',
-      email: createForm.email.trim(),
-      password: createForm.password,
-      full_name: createForm.full_name.trim(),
-    }, token)
-
-    if (result.error) {
-      setCreateError(result.error)
+    const { error: rpcError } = await supabase.rpc('admin_create_user', {
+      user_email: createForm.email.trim(),
+      user_password: createForm.password,
+      user_full_name: createForm.full_name.trim(),
+    })
+    if (rpcError) {
+      setCreateError(rpcError.message)
     } else {
       setCreateOpen(false)
       setCreateForm({ email: '', password: '', full_name: '' })
@@ -171,15 +163,18 @@ export default function UsersAdmin() {
 
   async function handleDelete(userId: string) {
     setDeleting(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token ?? ''
-    await callEdgeFn({ action: 'delete', user_id: userId }, token)
     setUsers(prev => prev.filter(u => u.id !== userId))
     setDeleteId(null)
+    await supabase.rpc('admin_delete_user', { target_user_id: userId })
     setDeleting(false)
+    await load()
   }
 
   const allClientsAllowed = (editForm.permissions.academic_clients ?? []).length === 0
+
+  const crmUsers = users.filter(u => u.role === 'admin' || u.role === 'user')
+  const landingUsers = users.filter(u => u.role === 'client')
+  const visibleUsers = tab === 'crm' ? crmUsers : landingUsers
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -188,10 +183,27 @@ export default function UsersAdmin() {
           <h1 className="text-2xl font-bold text-white">Пользователи</h1>
           <p className="text-sm text-slate-400 mt-0.5">Управление аккаунтами и правами доступа</p>
         </div>
-        <motion.button whileTap={{ scale: 0.97 }} onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-semibold px-5 py-2.5 rounded-xl shadow-glow hover:shadow-glow-lg transition-all duration-200 text-sm">
-          <Plus size={16} /> Добавить пользователя
-        </motion.button>
+        {tab === 'crm' && (
+          <motion.button whileTap={{ scale: 0.97 }} onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-2 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-semibold px-5 py-2.5 rounded-xl shadow-glow hover:shadow-glow-lg transition-all duration-200 text-sm">
+            <Plus size={16} /> Добавить пользователя
+          </motion.button>
+        )}
+      </div>
+
+      {/* Tab switcher */}
+      <div className="flex items-center gap-1 bg-navy-700 rounded-xl p-1 w-fit">
+        {([['crm', `CRM (${crmUsers.length})`, Users], ['landing', `Лендинг (${landingUsers.length})`, GraduationCap]] as [typeof tab, string, React.ElementType][]).map(([t, label, Icon]) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${
+              tab === t ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Icon size={12} /> {label}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -209,7 +221,7 @@ export default function UsersAdmin() {
       ) : (
         <div className="space-y-3">
           <AnimatePresence>
-            {users.map((u, i) => {
+            {visibleUsers.map((u, i) => {
               const isMe = u.id === currentUser?.id
               const perms = u.permissions ?? defaultPerms
               return (
@@ -253,24 +265,26 @@ export default function UsersAdmin() {
                         )}
                         <span className={clsx(
                           'text-[10px] px-1.5 py-0.5 rounded-md',
-                          u.role === 'admin'
-                            ? 'bg-amber-500/15 text-amber-400'
-                            : 'bg-slate-500/15 text-slate-400',
+                          u.role === 'admin' ? 'bg-amber-500/15 text-amber-400' :
+                          u.role === 'client' ? 'bg-violet-500/15 text-violet-400' :
+                          'bg-slate-500/15 text-slate-400',
                         )}>
-                          {u.role === 'admin' ? 'Администратор' : 'Пользователь'}
+                          {u.role === 'admin' ? 'Администратор' : u.role === 'client' ? 'Клиент' : 'Пользователь'}
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">{u.email}</p>
-                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                        <PermBadge allowed={perms.suppliers} icon={<Building2 size={10} />} label="Поставщики" />
-                        <PermBadge allowed={perms.academic} icon={<GraduationCap size={10} />} label={
-                          perms.academic
-                            ? perms.academic_clients?.length
-                              ? `Учёба (${perms.academic_clients.length} студ.)`
-                              : 'Учёба (все)'
-                            : 'Учёба'
-                        } />
-                      </div>
+                      {u.role !== 'client' && (
+                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                          <PermBadge allowed={perms.suppliers} icon={<Building2 size={10} />} label="Поставщики" />
+                          <PermBadge allowed={perms.academic} icon={<GraduationCap size={10} />} label={
+                            perms.academic
+                              ? perms.academic_clients?.length
+                                ? `Учёба (${perms.academic_clients.length} студ.)`
+                                : 'Учёба (все)'
+                              : 'Учёба'
+                          } />
+                        </div>
+                      )}
                     </div>
 
                     {/* Actions */}
@@ -327,7 +341,7 @@ export default function UsersAdmin() {
                 </label>
                 <select
                   value={editForm.role}
-                  onChange={e => setEditForm(f => ({ ...f, role: e.target.value as 'admin' | 'user' }))}
+                  onChange={e => setEditForm(f => ({ ...f, role: e.target.value as 'admin' | 'user' | 'client' }))}
                   className="w-full bg-navy-700 border border-navy-500 text-white px-4 py-2.5 rounded-xl focus:border-primary-500 outline-none transition-all text-sm"
                 >
                   <option value="user">Пользователь</option>
@@ -450,11 +464,33 @@ export default function UsersAdmin() {
               </div>
             )}
 
-            {/* Password change */}
+            {/* Password */}
             <div className="rounded-xl border border-white/[0.07] bg-navy-800/40 p-4 space-y-3">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                <Lock size={11} /> Сменить пароль
+                <Lock size={11} /> Пароль
               </p>
+
+              {/* Current password */}
+              <div>
+                <label className="block text-xs text-slate-500 mb-1.5">Текущий пароль</label>
+                <div className="flex items-center gap-2 bg-navy-700 border border-navy-500 rounded-xl px-4 py-2.5">
+                  <span className="flex-1 text-sm font-mono text-slate-300 select-all">
+                    {editUser.password_plain
+                      ? (showCurrentPassword ? editUser.password_plain : '•'.repeat(editUser.password_plain.length))
+                      : <span className="text-slate-600 italic font-sans">не сохранён</span>}
+                  </span>
+                  {editUser.password_plain && (
+                    <button type="button" onClick={() => setShowCurrentPassword(v => !v)}
+                      className="text-slate-500 hover:text-slate-300 transition-colors flex-shrink-0">
+                      {showCurrentPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* New password */}
+              <div>
+                <label className="block text-xs text-slate-500 mb-1.5">Новый пароль</label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <input
@@ -483,6 +519,7 @@ export default function UsersAdmin() {
               </div>
               {passwordError && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{passwordError}</p>}
               {passwordSuccess && <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">Пароль успешно изменён</p>}
+              </div>
             </div>
 
             <div className="flex gap-3 pt-1">

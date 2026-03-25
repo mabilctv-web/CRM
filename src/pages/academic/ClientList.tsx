@@ -1,12 +1,24 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, GraduationCap, ChevronRight, Edit2, Trash2, Users, BookOpen, Wallet, ToggleLeft, ToggleRight, Send } from 'lucide-react'
+import { Plus, GraduationCap, ChevronRight, Edit2, Trash2, Users, BookOpen, Wallet, ToggleLeft, ToggleRight, Send, Package, Mail, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../contexts/AuthContext'
 import type { AcademicClient } from '../../types/academic'
+import { format } from 'date-fns'
+import { ru } from 'date-fns/locale'
 import clsx from 'clsx'
+
+interface LandingUser { id: string; email: string; full_name: string | null; created_at: string }
+interface LandingOrder { id: string; client_email: string; subject: string; university: string | null; status: string; created_at: string; deadline: string | null }
+
+const ORDER_STATUS: Record<string, { label: string; color: string }> = {
+  new: { label: 'Новая', color: 'bg-cyan-500/15 text-cyan-400' },
+  in_progress: { label: 'В работе', color: 'bg-amber-500/15 text-amber-400' },
+  done: { label: 'Выполнена', color: 'bg-emerald-500/15 text-emerald-400' },
+  cancelled: { label: 'Отменена', color: 'bg-red-500/15 text-red-400' },
+}
 
 const emptyForm = {
   last_name: '', first_name: '', patronymic: '', university: '', faculty: '', year_of_study: '', semester: '', notes: '',
@@ -20,6 +32,9 @@ function fullName(c: { last_name?: string | null; first_name?: string | null; pa
 export default function ClientList() {
   const { isAdmin, allowedAcademicClients } = useAuth()
   const navigate = useNavigate()
+  const [tab, setTab] = useState<'crm' | 'landing'>('crm')
+
+  // CRM clients state
   const [clients, setClients] = useState<AcademicClient[]>([])
   const [stats, setStats] = useState<Record<number, { assignments: number; pending: number; debt: number; income: number }>>({})
   const [loading, setLoading] = useState(true)
@@ -28,6 +43,12 @@ export default function ClientList() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+
+  // Landing users state
+  const [landingUsers, setLandingUsers] = useState<LandingUser[]>([])
+  const [landingOrders, setLandingOrders] = useState<LandingOrder[]>([])
+  const [landingLoading, setLandingLoading] = useState(false)
+  const [expandedUser, setExpandedUser] = useState<string | null>(null)
 
   async function load() {
     let query = supabase.from('academic_clients').select('*').order('created_at', { ascending: false })
@@ -63,6 +84,19 @@ export default function ClientList() {
   }
 
   useEffect(() => { load() }, [isAdmin, allowedAcademicClients.join(',')])
+
+  async function loadLanding() {
+    setLandingLoading(true)
+    const [{ data: usersData }, { data: ordersData }] = await Promise.all([
+      supabase.rpc('admin_list_users'),
+      supabase.from('orders').select('id, client_email, subject, university, status, created_at, deadline').order('created_at', { ascending: false }),
+    ])
+    setLandingUsers(((usersData ?? []) as LandingUser[]).filter((u: LandingUser & { role?: string }) => u.role === 'client'))
+    setLandingOrders((ordersData ?? []) as LandingOrder[])
+    setLandingLoading(false)
+  }
+
+  useEffect(() => { if (tab === 'landing') loadLanding() }, [tab])
 
   function openAdd() { setEditing(null); setForm(emptyForm); setModalOpen(true) }
   function openEdit(c: AcademicClient) {
@@ -121,12 +155,12 @@ export default function ClientList() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Учебные услуги</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Управление заданиями и успеваемостью клиентов</p>
+          <p className="text-sm text-slate-400 mt-0.5">Клиенты на сопровождении и разовые заявки</p>
         </div>
-        {isAdmin && (
+        {isAdmin && tab === 'crm' && (
           <motion.button whileTap={{ scale: 0.97 }} onClick={openAdd}
             className="flex items-center gap-2 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-semibold px-5 py-2.5 rounded-xl shadow-glow hover:shadow-glow-lg transition-all duration-200 text-sm">
             <Plus size={16} /> Добавить клиента
@@ -134,7 +168,90 @@ export default function ClientList() {
         )}
       </div>
 
-      {loading ? (
+      {/* Tab switcher */}
+      <div className="flex items-center gap-1 bg-navy-700 rounded-xl p-1 w-fit">
+        <button onClick={() => setTab('crm')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${tab === 'crm' ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+          <GraduationCap size={12} /> Сопровождение ({clients.length})
+        </button>
+        <button onClick={() => setTab('landing')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${tab === 'landing' ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+          <Package size={12} /> Разовые заявки {landingUsers.length > 0 && `(${landingUsers.length})`}
+        </button>
+      </div>
+
+      {/* ── LANDING TAB ── */}
+      {tab === 'landing' && (
+        landingLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => <div key={i} className="glass rounded-2xl border border-white/[0.06] h-20 shimmer-bg" />)}
+          </div>
+        ) : landingUsers.length === 0 ? (
+          <div className="glass rounded-2xl border border-white/[0.06] flex flex-col items-center py-16 text-center">
+            <Package size={28} className="text-slate-600 mb-3" />
+            <p className="text-slate-400 font-medium">Клиентов с лендинга нет</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {landingUsers.map((u, i) => {
+              const userOrders = landingOrders.filter(o => o.client_email === u.email)
+              const isExpanded = expandedUser === u.id
+              return (
+                <motion.div key={u.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+                  className="glass rounded-2xl border border-white/[0.06] overflow-hidden">
+                  <button onClick={() => setExpandedUser(isExpanded ? null : u.id)}
+                    className="w-full flex items-center gap-4 p-5 hover:bg-white/[0.02] transition-colors text-left">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 text-sm font-bold text-white">
+                      {(u.full_name || u.email).charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-white">{u.full_name || u.email}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-violet-500/15 text-violet-400 rounded-md">Лендинг</span>
+                        {userOrders.length > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-navy-600 text-slate-400 rounded-md">{userOrders.length} заявок</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1"><Mail size={10} /> {u.email}</p>
+                    </div>
+                    <ChevronDown size={14} className={clsx('text-slate-500 flex-shrink-0 transition-transform', isExpanded && 'rotate-180')} />
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-white/[0.06]">
+                      {userOrders.length === 0 ? (
+                        <p className="text-sm text-slate-600 text-center py-4">Нет заявок</p>
+                      ) : userOrders.map(o => {
+                        const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.new
+                        return (
+                          <Link key={o.id} to={`/crm/orders/${o.id}`}
+                            className="flex items-center gap-3 px-5 py-3.5 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.03] transition-colors">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm text-white font-medium truncate">{o.subject}</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${st.color}`}>{st.label}</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                                {o.university && <span>{o.university}</span>}
+                                {o.deadline && <span>До {format(new Date(o.deadline), 'd MMM yyyy', { locale: ru })}</span>}
+                                <span>{format(new Date(o.created_at), 'd MMM yyyy', { locale: ru })}</span>
+                              </div>
+                            </div>
+                            <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </motion.div>
+              )
+            })}
+          </div>
+        )
+      )}
+
+      {/* ── CRM TAB ── */}
+      {tab === 'crm' && loading ? (
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="glass rounded-2xl border border-white/[0.06] p-6">
@@ -148,7 +265,7 @@ export default function ClientList() {
             </div>
           ))}
         </div>
-      ) : clients.length === 0 ? (
+      ) : tab === 'crm' && clients.length === 0 ? (
         <div className="glass rounded-2xl border border-white/[0.06] flex flex-col items-center justify-center py-16 text-center">
           <div className="w-16 h-16 rounded-2xl bg-navy-700 flex items-center justify-center mb-4">
             <GraduationCap size={28} className="text-slate-600" />
@@ -161,7 +278,7 @@ export default function ClientList() {
             </button>
           )}
         </div>
-      ) : (
+      ) : tab === 'crm' ? (
         <div className="space-y-4">
           <AnimatePresence>
             {clients.map((c, i) => {
@@ -245,7 +362,7 @@ export default function ClientList() {
             })}
           </AnimatePresence>
         </div>
-      )}
+      ) : null}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Редактировать клиента' : 'Новый клиент'} maxWidth="max-w-md">
         <div className="space-y-3">
