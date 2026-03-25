@@ -39,8 +39,7 @@ export interface PriceList {
   id: number
   supplier_id: number
   file_name: string
-  file_path: string
-  file_size: number | null
+  url: string | null
   uploaded_by: string | null
   created_at: string
 }

@@ -1,10 +1,10 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Edit2, Save, X, Phone, Mail, MapPin, User, Calendar,
-  Upload, Download, Trash2, Plus, CheckSquare, Square, AlertTriangle,
-  PhoneCall, FileText,
+  ExternalLink, Trash2, Plus, CheckSquare, Square, AlertTriangle,
+  PhoneCall, FileText, Link,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
@@ -19,7 +19,7 @@ import { SUPPLIER_STATUSES, SUPPLIER_CATEGORIES } from '../types'
 const TABS = [
   { id: 'info', label: 'Информация', icon: User },
   { id: 'criteria', label: 'Критерии', icon: FileText },
-  { id: 'pricelists', label: 'Прайс-листы', icon: Download },
+  { id: 'pricelists', label: 'Прайс-листы', icon: Link },
   { id: 'risks', label: 'Риски', icon: AlertTriangle },
   { id: 'tasks', label: 'Задачи', icon: CheckSquare },
   { id: 'calls', label: 'Звонки', icon: PhoneCall },
@@ -54,8 +54,8 @@ export default function SupplierDetail() {
   const [taskForm, setTaskForm] = useState({ title: '', deadline: '' })
   const [callForm, setCallForm] = useState({ call_date: '', summary: '', result: '' })
 
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
+  const [linkModal, setLinkModal] = useState(false)
+  const [linkForm, setLinkForm] = useState({ file_name: '', url: '' })
 
   async function loadAll() {
     if (!id) return
@@ -90,32 +90,19 @@ export default function SupplierDetail() {
     setSaving(false)
   }
 
-  async function uploadFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !id) return
-    setUploading(true)
-    const path = `${id}/${Date.now()}_${file.name}`
-    const { error } = await supabase.storage.from('price-lists').upload(path, file)
-    if (!error) {
-      await supabase.from('price_lists').insert({ supplier_id: Number(id), file_name: file.name, file_path: path, file_size: file.size })
-      loadAll()
-    }
-    setUploading(false)
-    if (fileRef.current) fileRef.current.value = ''
+  async function addLink() {
+    if (!linkForm.url.trim() || !id) return
+    const { data } = await supabase.from('price_lists').insert({
+      supplier_id: Number(id),
+      file_name: linkForm.file_name.trim() || linkForm.url,
+      url: linkForm.url.trim(),
+    }).select().single()
+    if (data) setPriceLists(prev => [data as PriceList, ...prev])
+    setLinkForm({ file_name: '', url: '' })
+    setLinkModal(false)
   }
 
-  async function downloadFile(pl: PriceList) {
-    const { data } = await supabase.storage.from('price-lists').createSignedUrl(pl.file_path, 3600)
-    if (data?.signedUrl) {
-      const a = document.createElement('a')
-      a.href = data.signedUrl
-      a.download = pl.file_name
-      a.click()
-    }
-  }
-
-  async function deleteFile(pl: PriceList) {
-    await supabase.storage.from('price-lists').remove([pl.file_path])
+  async function deleteLink(pl: PriceList) {
     await supabase.from('price_lists').delete().eq('id', pl.id)
     setPriceLists(prev => prev.filter(x => x.id !== pl.id))
   }
@@ -166,13 +153,6 @@ export default function SupplierDetail() {
 
   function getDisplayValue(criteriaId: number) {
     return criteriaId in draftValues ? draftValues[criteriaId] : getCriteriaValue(criteriaId)
-  }
-
-  function formatFileSize(bytes: number | null) {
-    if (!bytes) return '—'
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
   if (loading) {
@@ -395,42 +375,34 @@ export default function SupplierDetail() {
           {tab === 'pricelists' && (
             <div className="space-y-4">
               {isAdmin && (
-                <div>
-                  <input type="file" ref={fileRef} onChange={uploadFile} className="hidden" accept=".pdf,.xls,.xlsx,.doc,.docx,.csv,.zip" />
-                  <button
-                    onClick={() => fileRef.current?.click()}
-                    disabled={uploading}
-                    className="flex items-center gap-2 btn-secondary text-sm"
-                  >
-                    {uploading
-                      ? <div className="w-4 h-4 border-2 border-slate-400/30 border-t-slate-400 rounded-full animate-spin" />
-                      : <Upload size={14} />}
-                    Загрузить прайс-лист
-                  </button>
-                </div>
+                <button onClick={() => setLinkModal(true)} className="flex items-center gap-2 btn-secondary text-sm">
+                  <Plus size={14} /> Добавить ссылку
+                </button>
               )}
               {priceLists.length === 0 ? (
                 <div className="text-center py-8 text-slate-500 text-sm">
                   <FileText size={32} className="mx-auto mb-2 opacity-30" />
-                  Прайс-листы не загружены
+                  Прайс-листы не добавлены
                 </div>
               ) : (
                 <div className="space-y-2">
                   {priceLists.map(pl => (
                     <div key={pl.id} className="flex items-center gap-4 p-3.5 bg-navy-700/50 rounded-xl border border-white/[0.05] hover:border-white/10 transition-all">
                       <div className="w-9 h-9 rounded-lg bg-primary-600/20 flex items-center justify-center flex-shrink-0">
-                        <FileText size={16} className="text-primary-400" />
+                        <Link size={16} className="text-primary-400" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white truncate">{pl.file_name}</p>
-                        <p className="text-xs text-slate-500">{formatFileSize(pl.file_size)} · {format(new Date(pl.created_at), 'd MMM yyyy', { locale: ru })}</p>
+                        <p className="text-xs text-slate-500 truncate">{pl.url}</p>
                       </div>
                       <div className="flex gap-1">
-                        <button onClick={() => downloadFile(pl)} className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-all" title="Скачать">
-                          <Download size={14} />
-                        </button>
+                        {pl.url && (
+                          <a href={pl.url} target="_blank" rel="noopener noreferrer" className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-all" title="Открыть">
+                            <ExternalLink size={14} />
+                          </a>
+                        )}
                         {isAdmin && (
-                          <button onClick={() => deleteFile(pl)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all" title="Удалить">
+                          <button onClick={() => deleteLink(pl)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all" title="Удалить">
                             <Trash2 size={14} />
                           </button>
                         )}
@@ -538,6 +510,24 @@ export default function SupplierDetail() {
           )}
         </motion.div>
       </AnimatePresence>
+
+      {/* Link modal */}
+      <Modal open={linkModal} onClose={() => { setLinkModal(false); setLinkForm({ file_name: '', url: '' }) }} title="Добавить прайс-лист" maxWidth="max-w-md">
+        <div className="space-y-3 mb-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">Название</label>
+            <input value={linkForm.file_name} onChange={e => setLinkForm(f => ({ ...f, file_name: e.target.value }))} placeholder="напр. Прайс март 2026" className="w-full bg-navy-700 border border-navy-500 text-white placeholder-slate-600 px-3 py-2 rounded-xl text-sm outline-none focus:border-primary-500 transition-all" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">Ссылка *</label>
+            <input value={linkForm.url} onChange={e => setLinkForm(f => ({ ...f, url: e.target.value }))} placeholder="https://disk.yandex.ru/d/..." className="w-full bg-navy-700 border border-navy-500 text-white placeholder-slate-600 px-3 py-2 rounded-xl text-sm outline-none focus:border-primary-500 transition-all" />
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={addLink} disabled={!linkForm.url.trim()} className="flex-1 btn-primary text-sm py-2.5 disabled:opacity-50">Сохранить</button>
+          <button onClick={() => { setLinkModal(false); setLinkForm({ file_name: '', url: '' }) }} className="flex-1 btn-secondary text-sm py-2.5">Отмена</button>
+        </div>
+      </Modal>
 
       {/* Risk modal */}
       <Modal open={riskModal} onClose={() => setRiskModal(false)} title="Добавить риск" maxWidth="max-w-md">
