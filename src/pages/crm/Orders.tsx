@@ -8,6 +8,7 @@ import { ru } from 'date-fns/locale'
 
 interface Order {
   id: string
+  order_number: number | null
   subject: string
   university: string | null
   client_email: string | null
@@ -136,6 +137,9 @@ export default function CRMOrders() {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {o.order_number && (
+                        <span className="text-[10px] font-mono font-semibold text-slate-500">#{o.order_number}</span>
+                      )}
                       <span className="font-semibold text-white">{o.subject}</span>
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${s.color}`}>{s.label}</span>
                       <SourceBadge source={o.source} />

@@ -8,6 +8,7 @@ import { motion } from 'framer-motion'
 
 interface Order {
   id: string
+  order_number: number | null
   subject: string
   university: string | null
   description: string | null
@@ -115,6 +116,9 @@ export default function CRMOrderDetail() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-1">
+              {order.order_number && (
+                <span className="text-sm font-mono font-bold text-slate-500">#{order.order_number}</span>
+              )}
               <h1 className="text-xl font-bold text-white">{order.subject}</h1>
               {/* Source badge */}
               {isTelegram ? (

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, GraduationCap, ChevronRight, Edit2, Trash2, Users, BookOpen, Wallet, ToggleLeft, ToggleRight, Send, Package, Mail, ChevronDown } from 'lucide-react'
+import { Plus, GraduationCap, ChevronRight, Edit2, Trash2, BookOpen, Wallet, ToggleLeft, ToggleRight, Send, Package, Globe } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../contexts/AuthContext'
@@ -10,8 +10,19 @@ import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import clsx from 'clsx'
 
-interface LandingUser { id: string; email: string; full_name: string | null; created_at: string }
-interface LandingOrder { id: string; client_email: string; subject: string; university: string | null; status: string; created_at: string; deadline: string | null }
+interface LandingOrder {
+  id: string
+  order_number: number | null
+  client_email: string | null
+  client_name: string | null
+  subject: string
+  university: string | null
+  status: string
+  source: string
+  created_at: string
+  deadline: string | null
+  deadline_text: string | null
+}
 
 const ORDER_STATUS: Record<string, { label: string; color: string }> = {
   new: { label: 'Новая', color: 'bg-cyan-500/15 text-cyan-400' },
@@ -44,11 +55,10 @@ export default function ClientList() {
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
-  // Landing users state
-  const [landingUsers, setLandingUsers] = useState<LandingUser[]>([])
+  // Landing / orders state
   const [landingOrders, setLandingOrders] = useState<LandingOrder[]>([])
   const [landingLoading, setLandingLoading] = useState(false)
-  const [expandedUser, setExpandedUser] = useState<string | null>(null)
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all')
 
   async function load() {
     let query = supabase.from('academic_clients').select('*').order('created_at', { ascending: false })
@@ -87,11 +97,10 @@ export default function ClientList() {
 
   async function loadLanding() {
     setLandingLoading(true)
-    const [{ data: usersData }, { data: ordersData }] = await Promise.all([
-      supabase.rpc('admin_list_users'),
-      supabase.from('orders').select('id, client_email, subject, university, status, created_at, deadline').order('created_at', { ascending: false }),
-    ])
-    setLandingUsers(((usersData ?? []) as LandingUser[]).filter((u: LandingUser & { role?: string }) => u.role === 'client'))
+    const { data: ordersData } = await supabase
+      .from('orders')
+      .select('id, order_number, client_email, client_name, subject, university, status, source, created_at, deadline, deadline_text')
+      .order('created_at', { ascending: false })
     setLandingOrders((ordersData ?? []) as LandingOrder[])
     setLandingLoading(false)
   }
@@ -176,77 +185,81 @@ export default function ClientList() {
         </button>
         <button onClick={() => setTab('landing')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${tab === 'landing' ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-white'}`}>
-          <Package size={12} /> Разовые заявки {landingUsers.length > 0 && `(${landingUsers.length})`}
+          <Package size={12} /> Разовые заявки {landingOrders.length > 0 && `(${landingOrders.length})`}
         </button>
       </div>
 
-      {/* ── LANDING TAB ── */}
+      {/* ── LANDING / ORDERS TAB ── */}
       {tab === 'landing' && (
         landingLoading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map(i => <div key={i} className="glass rounded-2xl border border-white/[0.06] h-20 shimmer-bg" />)}
-          </div>
-        ) : landingUsers.length === 0 ? (
-          <div className="glass rounded-2xl border border-white/[0.06] flex flex-col items-center py-16 text-center">
-            <Package size={28} className="text-slate-600 mb-3" />
-            <p className="text-slate-400 font-medium">Клиентов с лендинга нет</p>
+            {[1, 2, 3].map(i => <div key={i} className="glass rounded-2xl border border-white/[0.06] h-16 shimmer-bg" />)}
           </div>
         ) : (
-          <div className="space-y-3">
-            {landingUsers.map((u, i) => {
-              const userOrders = landingOrders.filter(o => o.client_email === u.email)
-              const isExpanded = expandedUser === u.id
-              return (
-                <motion.div key={u.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                  className="glass rounded-2xl border border-white/[0.06] overflow-hidden">
-                  <button onClick={() => setExpandedUser(isExpanded ? null : u.id)}
-                    className="w-full flex items-center gap-4 p-5 hover:bg-white/[0.02] transition-colors text-left">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 text-sm font-bold text-white">
-                      {(u.full_name || u.email).charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-white">{u.full_name || u.email}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 bg-violet-500/15 text-violet-400 rounded-md">Лендинг</span>
-                        {userOrders.length > 0 && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-navy-600 text-slate-400 rounded-md">{userOrders.length} заявок</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1"><Mail size={10} /> {u.email}</p>
-                    </div>
-                    <ChevronDown size={14} className={clsx('text-slate-500 flex-shrink-0 transition-transform', isExpanded && 'rotate-180')} />
-                  </button>
+          <>
+            {/* Status filter */}
+            <div className="flex items-center gap-1 bg-navy-700 rounded-xl p-1 w-fit">
+              {[['all', 'Все'], ['new', 'Новые'], ['in_progress', 'В работе'], ['done', 'Готово']].map(([val, label]) => (
+                <button key={val} onClick={() => setOrderStatusFilter(val)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${orderStatusFilter === val ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
 
-                  {isExpanded && (
-                    <div className="border-t border-white/[0.06]">
-                      {userOrders.length === 0 ? (
-                        <p className="text-sm text-slate-600 text-center py-4">Нет заявок</p>
-                      ) : userOrders.map(o => {
-                        const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.new
-                        return (
-                          <Link key={o.id} to={`/crm/orders/${o.id}`}
-                            className="flex items-center gap-3 px-5 py-3.5 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.03] transition-colors">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm text-white font-medium truncate">{o.subject}</span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${st.color}`}>{st.label}</span>
-                              </div>
-                              <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
-                                {o.university && <span>{o.university}</span>}
-                                {o.deadline && <span>До {format(new Date(o.deadline), 'd MMM yyyy', { locale: ru })}</span>}
-                                <span>{format(new Date(o.created_at), 'd MMM yyyy', { locale: ru })}</span>
-                              </div>
-                            </div>
-                            <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </motion.div>
+            {(() => {
+              const filtered = landingOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter)
+              if (filtered.length === 0) return (
+                <div className="glass rounded-2xl border border-white/[0.06] flex flex-col items-center py-16 text-center">
+                  <Package size={28} className="text-slate-600 mb-3" />
+                  <p className="text-slate-400 font-medium">Заявок нет</p>
+                </div>
               )
-            })}
-          </div>
+              return (
+                <div className="space-y-2">
+                  {filtered.map((o, i) => {
+                    const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.new
+                    const clientLabel = o.client_name || o.client_email || '—'
+                    const dl = o.deadline
+                      ? format(new Date(o.deadline), 'd MMM yyyy', { locale: ru })
+                      : o.deadline_text || null
+                    return (
+                      <motion.div key={o.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+                        <Link to={`/crm/orders/${o.id}`}
+                          className="glass rounded-2xl border border-white/[0.06] hover:border-white/10 p-4 flex items-center gap-3 transition-all duration-200 hover:-translate-y-0.5 block">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {o.order_number && (
+                                <span className="text-[10px] font-mono font-semibold text-slate-500">#{o.order_number}</span>
+                              )}
+                              <span className="font-semibold text-white text-sm">{o.subject}</span>
+                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${st.color}`}>{st.label}</span>
+                              {o.source === 'telegram' ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border bg-sky-500/10 text-sky-400 border-sky-500/20">
+                                  <Send size={9} /> Telegram
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border bg-slate-500/10 text-slate-400 border-slate-500/20">
+                                  <Globe size={9} /> Сайт
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 flex-wrap">
+                              <span>{clientLabel}</span>
+                              {o.university && <span>• {o.university}</span>}
+                              {dl && <span>• до {dl}</span>}
+                              <span>• {format(new Date(o.created_at), 'd MMM yyyy', { locale: ru })}</span>
+                            </div>
+                          </div>
+                          <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
+                        </Link>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </>
         )
       )}
 
