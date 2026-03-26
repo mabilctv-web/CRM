@@ -8,7 +8,7 @@ interface AuthContextType {
   profile: Profile | null
   loading: boolean
   isAdmin: boolean
-  canAccess: (section: 'suppliers' | 'academic') => boolean
+  canAccess: (section: 'suppliers' | 'academic' | 'orders') => boolean
   allowedAcademicClients: number[] // empty = all
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>
@@ -112,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAdmin = profile?.role === 'admin'
   const permissions: UserPermissions = profile?.permissions ?? DEFAULT_PERMISSIONS
 
-  function canAccess(section: 'suppliers' | 'academic'): boolean {
+  function canAccess(section: 'suppliers' | 'academic' | 'orders'): boolean {
     if (isAdmin) return true
     return permissions[section] === true
   }

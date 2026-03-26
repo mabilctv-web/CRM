@@ -48,8 +48,10 @@ export default function App() {
                 <Route path="/academic/clients/:id" element={<ClientDetail />} />
               </Route>
               <Route path="/profile" element={<Profile />} />
-              <Route path="/crm/orders" element={<CRMOrders />} />
-              <Route path="/crm/orders/:id" element={<CRMOrderDetail />} />
+              <Route element={<ProtectedRoute section="orders" />}>
+                <Route path="/crm/orders" element={<CRMOrders />} />
+                <Route path="/crm/orders/:id" element={<CRMOrderDetail />} />
+              </Route>
               <Route element={<ProtectedRoute adminOnly />}>
                 <Route path="/admin/criteria" element={<Criteria />} />
                 <Route path="/admin/categories" element={<SupplierCategories />} />

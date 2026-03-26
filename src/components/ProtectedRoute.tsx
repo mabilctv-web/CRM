@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 interface Props {
   adminOnly?: boolean
-  section?: 'suppliers' | 'academic'
+  section?: 'suppliers' | 'academic' | 'orders'
 }
 
 export default function ProtectedRoute({ adminOnly = false, section }: Props) {

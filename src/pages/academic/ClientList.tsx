@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, GraduationCap, ChevronRight, Edit2, Trash2, BookOpen, Wallet, ToggleLeft, ToggleRight, Send, Package, Globe } from 'lucide-react'
+import { Plus, GraduationCap, ChevronRight, Edit2, Trash2, BookOpen, Wallet, ToggleLeft, ToggleRight, Send, Package, Globe, Crown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../contexts/AuthContext'
@@ -19,6 +19,7 @@ interface LandingOrder {
   university: string | null
   status: string
   source: string
+  order_type: string | null
   created_at: string
   deadline: string | null
   deadline_text: string | null
@@ -99,7 +100,7 @@ export default function ClientList() {
     setLandingLoading(true)
     const { data: ordersData } = await supabase
       .from('orders')
-      .select('id, order_number, client_email, client_name, subject, university, status, source, created_at, deadline, deadline_text')
+      .select('id, order_number, client_email, client_name, subject, university, status, source, order_type, created_at, deadline, deadline_text')
       .order('created_at', { ascending: false })
     setLandingOrders((ordersData ?? []) as LandingOrder[])
     setLandingLoading(false)
@@ -226,7 +227,7 @@ export default function ClientList() {
                     return (
                       <motion.div key={o.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                         <Link to={`/crm/orders/${o.id}`}
-                          className="glass rounded-2xl border border-white/[0.06] hover:border-white/10 p-4 flex items-center gap-3 transition-all duration-200 hover:-translate-y-0.5 block">
+                          className={`glass rounded-2xl border p-4 flex items-center gap-3 transition-all duration-200 hover:-translate-y-0.5 block ${o.order_type === 'full_service' ? 'border-amber-500/30 hover:border-amber-500/50 bg-amber-500/5' : 'border-white/[0.06] hover:border-white/10'}`}>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               {o.order_number && (
@@ -234,6 +235,11 @@ export default function ClientList() {
                               )}
                               <span className="font-semibold text-white text-sm">{o.subject}</span>
                               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${st.color}`}>{st.label}</span>
+                              {o.order_type === 'full_service' && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-500/15 text-amber-400 border-amber-500/30">
+                                  <Crown size={9} /> Сопровождение
+                                </span>
+                              )}
                               {o.source === 'telegram' ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border bg-sky-500/10 text-sky-400 border-sky-500/20">
                                   <Send size={9} /> Telegram

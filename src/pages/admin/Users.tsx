@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Trash2, Edit2, Users, Shield, UserCheck, UserX,
   Building2, GraduationCap, ChevronDown, ChevronUp, Mail, Key,
-  ToggleLeft, ToggleRight, Save, X, Eye, EyeOff, Lock,
+  ToggleLeft, ToggleRight, Save, X, Eye, EyeOff, Lock, ShoppingBag,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
@@ -24,7 +24,7 @@ interface AdminUser {
   last_sign_in_at: string | null
 }
 
-const defaultPerms: UserPermissions = { suppliers: false, academic: false, academic_clients: [] }
+const defaultPerms: UserPermissions = { suppliers: false, academic: false, academic_clients: [], orders: false }
 
 async function callEdgeFn(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('admin-manage-users', { body })
@@ -283,6 +283,7 @@ export default function UsersAdmin() {
                                 : 'Учёба (все)'
                               : 'Учёба'
                           } />
+                          <PermBadge allowed={perms.orders ?? false} icon={<ShoppingBag size={10} />} label="Заявки" />
                         </div>
                       )}
                     </div>
@@ -394,6 +395,15 @@ export default function UsersAdmin() {
                   description="Раздел /учёба"
                   enabled={editForm.permissions.academic}
                   onChange={v => setEditForm(f => ({ ...f, permissions: { ...f.permissions, academic: v, academic_clients: v ? f.permissions.academic_clients : [] } }))}
+                />
+
+                {/* Orders */}
+                <PermToggle
+                  icon={<ShoppingBag size={14} />}
+                  label="Разовые заявки (CRM)"
+                  description="Просмотр и управление заявками клиентов"
+                  enabled={editForm.permissions.orders ?? false}
+                  onChange={v => setEditForm(f => ({ ...f, permissions: { ...f.permissions, orders: v } }))}
                 />
 
                 {/* Academic clients sub-permission */}

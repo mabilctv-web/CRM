@@ -4,12 +4,14 @@ export interface UserPermissions {
   suppliers: boolean
   academic: boolean
   academic_clients: number[] // empty = all, non-empty = only these IDs
+  orders: boolean
 }
 
 export const DEFAULT_PERMISSIONS: UserPermissions = {
   suppliers: false,
   academic: false,
   academic_clients: [],
+  orders: false,
 }
 
 export interface Profile {

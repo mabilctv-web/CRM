@@ -15,6 +15,7 @@ import {
   Bell,
   BellRing,
   Tag,
+  ShoppingBag,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../contexts/AuthContext'
@@ -70,6 +71,9 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         )}
         {canAccess('academic') && (
           <NavItem to="/academic/clients" icon={GraduationCap} label="Учебные услуги" collapsed={collapsed} active={location.pathname.startsWith('/academic')} />
+        )}
+        {canAccess('orders') && (
+          <NavItem to="/crm/orders" icon={ShoppingBag} label="Разовые заявки" collapsed={collapsed} active={location.pathname.startsWith('/crm')} />
         )}
         {isAdmin && (
           <>

@@ -7,9 +7,8 @@ import {
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend,
 } from 'recharts'
-import { format, subMonths, startOfMonth, endOfMonth, differenceInDays, isPast, parseISO } from 'date-fns'
+import { format, startOfMonth, endOfMonth, differenceInDays, isPast, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -18,7 +17,7 @@ import StatusBadge from '../components/ui/StatusBadge'
 import type { Supplier } from '../types'
 import clsx from 'clsx'
 
-interface MonthData { month: string; count: number }
+interface DayData { day: string; count: number }
 interface AcademicSummary {
   activeClients: number; totalClients: number; inProgress: number; overdue: number
   totalDebt: number; totalIncome: number
@@ -29,10 +28,12 @@ interface AcademicSummary {
 }
 interface SupplierSummary {
   total: number; active: number; newThisMonth: number; priceLists: number
-  monthlyData: MonthData[]
+  dailyData: DayData[]
   tasksDue: { id: number; title: string; supplierName: string; deadline: string | null }[]
   missingCriteria: { id: number; name: string }[]
-  categoryData: { name: string; value: number }[]
+}
+interface OrdersSummary {
+  total: number; new_count: number; in_progress: number; done: number; full_service: number
 }
 interface StudentSummary {
   done: number; inProgress: number; overdue: number
@@ -55,7 +56,6 @@ interface PendingSupplier {
   created_at: string
 }
 
-const PIE_COLORS = ['#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#3b82f6','#ec4899','#84cc16','#f97316']
 const DASHBOARD_LS_KEY = 'dashboard_hidden'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07 } } }
@@ -93,6 +93,7 @@ export default function Dashboard() {
   const { profile, isAdmin, canAccess, allowedAcademicClients } = useAuth()
   const navigate = useNavigate()
   const [supplierData, setSupplierData] = useState<SupplierSummary | null>(null)
+  const [ordersSummary, setOrdersSummary] = useState<OrdersSummary | null>(null)
   const [academic, setAcademic] = useState<AcademicSummary | null>(null)
   const [studentData, setStudentData] = useState<StudentSummary | null>(null)
   const [attendances, setAttendances] = useState<AttendanceItem[]>([])
@@ -150,24 +151,15 @@ export default function Dashboard() {
           supabase.from('suppliers').select('id, name, category, created_at').eq('status', 'pending').order('created_at', { ascending: false }).limit(5),
         ])
 
-        const months: MonthData[] = []
-        for (let i = 5; i >= 0; i--) {
-          const m = subMonths(now, i)
-          const mStart = startOfMonth(m).toISOString()
-          const mEnd = endOfMonth(m).toISOString()
-          const count = (allSuppliers ?? []).filter(s => s.created_at >= mStart && s.created_at <= mEnd).length
-          months.push({ month: format(m, 'LLL', { locale: ru }), count })
+        // Daily data for last 30 days
+        const days: DayData[] = []
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date(now)
+          d.setDate(d.getDate() - i)
+          const dayStr = d.toISOString().slice(0, 10)
+          const count = (allSuppliers ?? []).filter(s => s.created_at.slice(0, 10) === dayStr).length
+          days.push({ day: format(d, 'd MMM', { locale: ru }), count })
         }
-
-        // Category pie data
-        const categoryCounts: Record<string, number> = {}
-        for (const s of allSuppliers ?? []) {
-          const cat = s.category ?? 'Без категории'
-          categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1
-        }
-        const categoryData = Object.entries(categoryCounts)
-          .map(([name, value]) => ({ name, value }))
-          .sort((a, b) => b.value - a.value)
 
         // Suppliers missing required criteria
         const requiredIds = (criteria ?? []).map(c => c.id)
@@ -186,8 +178,7 @@ export default function Dashboard() {
 
         setSupplierData({
           total: total ?? 0, active: active ?? 0, newThisMonth: newThisMonth ?? 0, priceLists: priceLists ?? 0,
-          monthlyData: months, tasksDue, missingCriteria: missing.map(s => ({ id: s.id, name: s.name })),
-          categoryData,
+          dailyData: days, tasksDue, missingCriteria: missing.map(s => ({ id: s.id, name: s.name })),
         })
       }
 
@@ -269,6 +260,18 @@ export default function Dashboard() {
           overdue: asgn.filter(a => a.deadline && isPast(parseISO(a.deadline)) && a.status !== 'done').length,
           totalDebt: fin.reduce((s, f) => s + (Number(f.debt) || 0), 0),
           totalIncome: fin.reduce((s, f) => s + (Number(f.income) || 0), 0),
+        })
+      }
+
+      if (isAdmin) {
+        const { data: ordersData } = await supabase.from('orders').select('status, order_type')
+        const oa = ordersData ?? []
+        setOrdersSummary({
+          total: oa.length,
+          new_count: oa.filter(o => o.status === 'new').length,
+          in_progress: oa.filter(o => o.status === 'in_progress').length,
+          done: oa.filter(o => o.status === 'done').length,
+          full_service: oa.filter(o => o.order_type === 'full_service').length,
         })
       }
 
@@ -387,61 +390,21 @@ export default function Dashboard() {
             ))}
           </motion.div>
 
-          {/* Charts row */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {/* Monthly bar chart */}
-            <motion.div variants={item} className="glass rounded-2xl p-6 border border-white/[0.06]">
-              <h3 className="text-base font-semibold text-white mb-1">Динамика добавления</h3>
-              <p className="text-xs text-slate-500 mb-6">Поставщики за последние 6 месяцев</p>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={supplierData.monthlyData} barSize={28}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip contentStyle={{ background: '#0f1628', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, color: '#fff' }} cursor={{ fill: 'rgba(139,92,246,0.08)' }} formatter={(v: number) => [v, 'Поставщиков']} />
-                  <Bar dataKey="count" fill="url(#barGrad)" radius={[6, 6, 0, 0]} />
-                  <defs><linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#6d28d9" /></linearGradient></defs>
-                </BarChart>
-              </ResponsiveContainer>
-            </motion.div>
-
-            {/* Pie chart by category */}
-            {supplierData.categoryData.length > 0 && (
-              <motion.div variants={item} className="glass rounded-2xl p-6 border border-white/[0.06]">
-                <h3 className="text-base font-semibold text-white mb-1">По категориям</h3>
-                <p className="text-xs text-slate-500 mb-4">Распределение поставщиков</p>
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={supplierData.categoryData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={85}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {supplierData.categoryData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip
-                      contentStyle={{ background: '#0f1628', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, color: '#fff' }}
-                      formatter={(value: number, name: string) => [`${value} поставщиков`, name]}
-                    />
-                    <Legend
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      formatter={(value: string, entry: any) => (
-                        <span style={{ color: '#94a3b8', fontSize: 11 }}>
-                          {value} ({entry?.payload?.value ?? 0})
-                        </span>
-                      )}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </motion.div>
-            )}
-          </div>
+          {/* Daily bar chart */}
+          <motion.div variants={item} className="glass rounded-2xl p-6 border border-white/[0.06]">
+            <h3 className="text-base font-semibold text-white mb-1">Динамика добавления</h3>
+            <p className="text-xs text-slate-500 mb-6">Поставщики за последние 30 дней</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={supplierData.dailyData} barSize={8}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} interval={4} />
+                <YAxis tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={{ background: '#0f1628', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, color: '#fff' }} cursor={{ fill: 'rgba(139,92,246,0.08)' }} formatter={(v: number) => [v, 'Поставщиков']} />
+                <Bar dataKey="count" fill="url(#barGrad)" radius={[4, 4, 0, 0]} />
+                <defs><linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#6d28d9" /></linearGradient></defs>
+              </BarChart>
+            </ResponsiveContainer>
+          </motion.div>
 
           {/* Admin: tasks + missing criteria + pending suppliers */}
           {isAdmin && (
@@ -505,6 +468,35 @@ export default function Dashboard() {
             </motion.div>
           )}
         </>
+      )}
+
+      {/* ── ORDERS SUMMARY (admin only) ── */}
+      {isAdmin && ordersSummary && (
+        <motion.div variants={item} className="glass rounded-2xl border border-white/[0.06]">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+            <div className="flex items-center gap-2">
+              <ClipboardList size={16} className="text-sky-400" />
+              <h3 className="text-sm font-semibold text-white">Единоразовые заявки — сводка</h3>
+            </div>
+            <Link to="/crm/orders" className="text-xs text-primary-400 hover:text-primary-300 transition-colors flex items-center gap-1">
+              Все заявки <ArrowUpRight size={12} />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-px border-b border-white/[0.06] bg-white/[0.03]">
+            {[
+              { label: 'Всего заявок', value: String(ordersSummary.total), color: 'text-white' },
+              { label: 'Новые', value: String(ordersSummary.new_count), color: 'text-cyan-400' },
+              { label: 'В работе', value: String(ordersSummary.in_progress), color: 'text-amber-400' },
+              { label: 'Выполнено', value: String(ordersSummary.done), color: 'text-emerald-400' },
+              { label: 'Сопровождение 👑', value: String(ordersSummary.full_service), color: 'text-amber-400' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="flex flex-col gap-1 px-5 py-4 bg-navy-800/30">
+                <p className={clsx('text-xl font-bold', color)}>{value}</p>
+                <p className="text-[11px] text-slate-500">{label}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       )}
 
       {/* ── ACADEMIC BLOCK (admin / full access) ── */}
