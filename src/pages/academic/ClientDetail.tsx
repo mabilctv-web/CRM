@@ -190,9 +190,13 @@ export default function ClientDetail() {
         <div className="flex items-center gap-2 flex-shrink-0">
           {client.telegram_chat_id ? (
             <>
-              <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-emerald-400 bg-emerald-500/10 text-xs font-medium">
-                <CheckCircle2 size={13} /> Telegram
-              </span>
+              <a
+                href={`tg://user?id=${client.telegram_chat_id}`}
+                title="Открыть Telegram"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors text-xs font-medium"
+              >
+                <CheckCircle2 size={13} /> Telegram ↗
+              </a>
               <button
                 onClick={sendTestNotification}
                 disabled={testNotifSending}

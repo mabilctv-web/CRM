@@ -1,13 +1,17 @@
 import { useState, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { GraduationCap, ArrowLeft, Upload, X, Send, Calendar, BookOpen, Building2, Mail, FileText } from 'lucide-react'
+import { GraduationCap, ArrowLeft, Upload, X, Send, Calendar, BookOpen, Building2, Mail, FileText, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
-const EDGE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-order`
+function getMinDeadline() {
+  const d = new Date()
+  d.setHours(d.getHours() + 1)
+  // datetime-local format: YYYY-MM-DDTHH:mm
+  return d.toISOString().slice(0, 16)
+}
 
 export default function Order() {
-  const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState({
@@ -16,10 +20,12 @@ export default function Order() {
     university: '',
     description: '',
     deadline: '',
+    telegram: '',
   })
   const [files, setFiles] = useState<File[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
 
   function addFiles(list: FileList | null) {
     if (!list) return
@@ -36,39 +42,71 @@ export default function Order() {
     setLoading(true)
 
     try {
-      const res = await fetch(EDGE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      const data = await res.json()
-      if (data.error) { setError(data.error); setLoading(false); return }
+      // Insert order directly (anon insert policy allows this)
+      const { data: orderData, error: orderError } = await supabase.from('orders').insert({
+        client_email:    form.email.trim(),
+        client_telegram: form.telegram.trim() ? form.telegram.trim().replace('@', '') : null,
+        subject:         form.subject.trim(),
+        university:      form.university.trim() || null,
+        description:     form.description.trim(),
+        deadline:        form.deadline || null,
+        source:          'website',
+        order_type:      'one_time',
+        status:          'new',
+      }).select('id').single()
 
-      // Auto sign-in for new users
-      if (data.isNew && data.tempPassword) {
-        await supabase.auth.signInWithPassword({ email: form.email, password: data.tempPassword })
+      if (orderError || !orderData) {
+        setError('Ошибка при отправке. Попробуйте ещё раз.')
+        setLoading(false)
+        return
       }
 
-      // Upload files if any
-      if (files.length > 0) {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          for (const file of files) {
-            const path = `${data.orderId}/${Date.now()}_${file.name}`
-            const { data: uploaded } = await supabase.storage.from('order-files').upload(path, file)
-            if (uploaded) {
-              const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
-              await supabase.from('order_files').insert({ order_id: data.orderId, file_name: file.name, file_url: publicUrl })
-            }
-          }
+      const orderId = orderData.id
+
+      // Upload files to storage (anon upload enabled)
+      for (const file of files) {
+        const ext = file.name.split('.').pop() ?? 'bin'
+        const path = `${orderId}/${Date.now()}_${file.name}`
+        const { data: uploaded } = await supabase.storage
+          .from('order-files')
+          .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: true })
+        if (uploaded) {
+          const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
+          await supabase.from('order_files').insert({ order_id: orderId, file_name: file.name, file_url: publicUrl })
         }
       }
 
-      navigate(`/my?new=${data.isNew ? '1' : '0'}`)
+      setDone(true)
     } catch {
       setError('Ошибка при отправке. Попробуйте снова.')
     }
     setLoading(false)
+  }
+
+  if (done) {
+    return (
+      <div className="min-h-screen bg-navy-900 text-white flex items-center justify-center px-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-md"
+        >
+          <div className="w-20 h-20 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-6">
+            <CheckCircle size={36} className="text-emerald-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-3">Заявка отправлена!</h1>
+          <p className="text-slate-400 mb-8 leading-relaxed">
+            Мы получили вашу заявку и свяжемся с вами в ближайшее время для согласования деталей.
+          </p>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-primary-600 to-violet-600 text-white font-semibold px-6 py-3 rounded-xl text-sm"
+          >
+            На главную
+          </Link>
+        </motion.div>
+      </div>
+    )
   }
 
   return (
@@ -91,7 +129,7 @@ export default function Order() {
       <div className="pt-24 pb-16 px-6">
         <div className="max-w-2xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <h1 className="text-3xl font-bold mb-2">Новая заявка</h1>
+            <h1 className="text-3xl font-bold mb-2">Разовое задание</h1>
             <p className="text-slate-400 mb-8">Заполните форму — мы свяжемся с вами в ближайшее время</p>
           </motion.div>
 
@@ -112,6 +150,21 @@ export default function Order() {
                   value={form.email}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                   placeholder="your@email.com"
+                  className="w-full bg-navy-800 border border-navy-600 text-white placeholder-slate-600 pl-11 pr-4 py-3 rounded-xl focus:border-primary-500 outline-none transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Telegram */}
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">Telegram</label>
+              <div className="relative">
+                <Send size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  value={form.telegram}
+                  onChange={e => setForm(f => ({ ...f, telegram: e.target.value.replace('@', '') }))}
+                  placeholder="@username (необязательно)"
                   className="w-full bg-navy-800 border border-navy-600 text-white placeholder-slate-600 pl-11 pr-4 py-3 rounded-xl focus:border-primary-500 outline-none transition-all text-sm"
                 />
               </div>
@@ -165,14 +218,14 @@ export default function Order() {
 
             {/* Deadline */}
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Дедлайн</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">Дедлайн (минимум через 1 час)</label>
               <div className="relative">
                 <Calendar size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={form.deadline}
                   onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={getMinDeadline()}
                   className="w-full bg-navy-800 border border-navy-600 text-white pl-11 pr-4 py-3 rounded-xl focus:border-primary-500 outline-none transition-all text-sm [color-scheme:dark]"
                 />
               </div>
@@ -187,7 +240,7 @@ export default function Order() {
               >
                 <Upload size={20} className="mx-auto text-slate-600 group-hover:text-primary-400 transition-colors mb-2" />
                 <p className="text-sm text-slate-500 group-hover:text-slate-400 transition-colors">Нажмите для выбора файлов</p>
-                <p className="text-xs text-slate-600 mt-1">PDF, DOC, DOCX, XLSX, JPG, PNG</p>
+                <p className="text-xs text-slate-600 mt-1">PDF, DOC, DOCX, XLSX, JPG, PNG и другие</p>
               </div>
               <input ref={fileRef} type="file" multiple className="hidden" onChange={e => addFiles(e.target.files)} />
               {files.length > 0 && (

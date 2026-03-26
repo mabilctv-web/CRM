@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -26,18 +26,14 @@ const steps = [
   { n: '04', title: 'Получите результат',desc: 'Готовая работа с возможностью правок при необходимости' },
 ]
 
-const reviews = [
-  { name: 'Анастасия К.', text: 'Курсовая сдана на отлично! Всё чётко, в срок, без лишних вопросов. Уже третий раз обращаюсь.', stars: 5 },
-  { name: 'Дмитрий М.',   text: 'Помогли с дипломной работой. Научный руководитель одобрил без замечаний. Спасибо!',            stars: 5 },
-  { name: 'Алина В.',     text: 'Быстро и качественно. Контрольная по статистике была готова за день. Рекомендую.',              stars: 5 },
-]
+interface Review { id: number; author_name: string; text: string; stars: number }
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
   show: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1, duration: 0.5, ease: 'easeOut' } }),
 }
 
-const emptyForm = { name: '', email: '', phone: '', course: '', university: '' }
+const emptyForm = { name: '', email: '', phone: '', telegram: '', course: '', university: '' }
 
 export default function Landing() {
   const [modalOpen, setModalOpen]   = useState(false)
@@ -45,21 +41,33 @@ export default function Landing() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted]   = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [reviews, setReviews]       = useState<Review[]>([])
+  const [doneCount, setDoneCount]   = useState<number | null>(null)
+
+  useEffect(() => {
+    supabase.from('landing_reviews').select('id, author_name, text, stars').eq('visible', true).order('sort_order').then(({ data }) => {
+      if (data) setReviews(data as Review[])
+    })
+    supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'done').then(({ count }) => {
+      setDoneCount(count ?? 0)
+    })
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitError('')
     setSubmitting(true)
     const { error } = await supabase.from('orders').insert({
-      client_name:  form.name.trim(),
-      client_email: form.email.trim(),
-      client_phone: form.phone.trim() || null,
-      subject:      'Полное сопровождение',
-      description:  `Курс: ${form.course}`,
-      university:   form.university.trim() || null,
-      source:       'website',
-      order_type:   'full_service',
-      status:       'new',
+      client_name:     form.name.trim(),
+      client_email:    form.email.trim(),
+      client_phone:    form.phone.trim() || null,
+      client_telegram: form.telegram.trim() || null,
+      subject:         'Полное сопровождение',
+      description:     `Курс: ${form.course}`,
+      university:      form.university.trim() || null,
+      source:          'website',
+      order_type:      'full_service',
+      status:          'new',
     })
     setSubmitting(false)
     if (error) { setSubmitError('Ошибка при отправке. Попробуйте ещё раз.') }
@@ -134,7 +142,7 @@ export default function Landing() {
                 to="/order"
                 className="flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 border border-white/10 hover:border-white/20 text-white font-semibold px-8 py-3.5 rounded-xl text-sm transition-all duration-200"
               >
-                <FileText size={15} /> Индивидуальное ведение
+                <FileText size={15} /> Разовое задание
               </Link>
               <button
                 onClick={() => setModalOpen(true)}
@@ -152,9 +160,9 @@ export default function Landing() {
           className="mt-16 grid grid-cols-3 max-w-xl mx-auto gap-6"
         >
           {[
-            { value: '200+', label: 'Выполненных работ' },
-            { value: '98%',  label: 'Положительных оценок' },
-            { value: '24ч',  label: 'Минимальный срок' },
+            { value: doneCount !== null ? `${doneCount}+` : '...', label: 'Выполненных работ' },
+            { value: '98%', label: 'Положительных оценок' },
+            { value: '1 час', label: 'Минимальный срок' },
           ].map(({ value, label }) => (
             <div key={label} className="text-center">
               <div className="text-3xl font-bold bg-gradient-to-r from-primary-400 to-violet-400 bg-clip-text text-transparent">{value}</div>
@@ -299,7 +307,7 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {reviews.map((r, i) => (
               <motion.div
-                key={r.name}
+                key={r.id}
                 custom={i}
                 initial="hidden"
                 whileInView="show"
@@ -315,9 +323,9 @@ export default function Landing() {
                 <p className="text-sm text-slate-300 mb-4 leading-relaxed">"{r.text}"</p>
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-primary-500/20 flex items-center justify-center text-xs font-semibold text-primary-300">
-                    {r.name[0]}
+                    {r.author_name[0]}
                   </div>
-                  <span className="text-xs text-slate-500">{r.name}</span>
+                  <span className="text-xs text-slate-500">{r.author_name}</span>
                 </div>
               </motion.div>
             ))}
@@ -421,14 +429,25 @@ export default function Landing() {
                         className={inp}
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1.5">Телефон</label>
-                      <input
-                        type="tel" value={form.phone}
-                        onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                        placeholder="+7 (999) 000-00-00"
-                        className={inp}
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1.5">Телефон</label>
+                        <input
+                          type="tel" value={form.phone}
+                          onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                          placeholder="+7 (999) 000-00-00"
+                          className={inp}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1.5">Telegram</label>
+                        <input
+                          type="text" value={form.telegram}
+                          onChange={e => setForm(f => ({ ...f, telegram: e.target.value.replace('@', '') }))}
+                          placeholder="@username"
+                          className={inp}
+                        />
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>

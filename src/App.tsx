@@ -13,6 +13,7 @@ import Suppliers from './pages/Suppliers'
 import SupplierDetail from './pages/SupplierDetail'
 import Criteria from './pages/admin/Criteria'
 import SupplierCategories from './pages/admin/SupplierCategories'
+import SupplierStatuses from './pages/admin/SupplierStatuses'
 import PaymentContacts from './pages/admin/PaymentContacts'
 import UsersAdmin from './pages/admin/Users'
 import NotificationSettings from './pages/admin/NotificationSettings'
@@ -55,6 +56,7 @@ export default function App() {
               <Route element={<ProtectedRoute adminOnly />}>
                 <Route path="/admin/criteria" element={<Criteria />} />
                 <Route path="/admin/categories" element={<SupplierCategories />} />
+                <Route path="/admin/supplier-statuses" element={<SupplierStatuses />} />
                 <Route path="/admin/payment-contacts" element={<PaymentContacts />} />
                 <Route path="/admin/users" element={<UsersAdmin />} />
                 <Route path="/admin/notifications" element={<NotificationSettings />} />

@@ -22,6 +22,7 @@ interface Order {
   client_email: string | null
   client_name: string | null
   client_phone: string | null
+  client_telegram: string | null
   telegram_chat_id: string | null
   source: string
   order_type: string | null
@@ -189,6 +190,15 @@ export default function CRMOrderDetail() {
             <p className="text-xs text-slate-500 mt-1">{clientDisplay}</p>
             {order.client_phone && (
               <p className="text-xs text-slate-500 mt-0.5">📞 {order.client_phone}</p>
+            )}
+            {order.client_telegram && (
+              <p className="text-xs text-slate-500 mt-0.5">
+                ✈️{' '}
+                <a href={`https://t.me/${order.client_telegram}`} target="_blank" rel="noopener noreferrer"
+                  className="text-sky-400 hover:underline">
+                  @{order.client_telegram}
+                </a>
+              </p>
             )}
             {isTelegram && order.telegram_chat_id && (
               <p className="text-xs text-sky-500/70 mt-0.5">

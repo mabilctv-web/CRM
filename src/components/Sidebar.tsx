@@ -23,6 +23,7 @@ import { useAuth } from '../contexts/AuthContext'
 const supplierAdminNav = [
   { to: '/admin/criteria', icon: ListChecks, label: 'Критерии' },
   { to: '/admin/categories', icon: Tag, label: 'Категории' },
+  { to: '/admin/supplier-statuses', icon: Layers, label: 'Статусы' },
 ]
 
 const studentAdminNav = [
@@ -69,11 +70,15 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         {canAccess('suppliers') && (
           <NavItem to="/suppliers" icon={Building2} label="Поставщики" collapsed={collapsed} active={location.pathname.startsWith('/suppliers')} />
         )}
-        {canAccess('academic') && (
-          <NavItem to="/academic/clients" icon={GraduationCap} label="Учебные услуги" collapsed={collapsed} active={location.pathname.startsWith('/academic')} />
-        )}
-        {canAccess('orders') && (
-          <NavItem to="/crm/orders" icon={ShoppingBag} label="Разовые заявки" collapsed={collapsed} active={location.pathname.startsWith('/crm')} />
+        {(canAccess('academic') || canAccess('orders')) && (
+          <>
+            <NavItem to="/academic/clients" icon={GraduationCap} label="Учебные услуги" collapsed={collapsed} active={location.pathname.startsWith('/academic')} />
+            {canAccess('orders') && (
+              <div className={clsx('pl-4', collapsed && 'pl-0')}>
+                <NavItem to="/crm/orders" icon={ShoppingBag} label="Разовые задания" collapsed={collapsed} active={location.pathname.startsWith('/crm')} />
+              </div>
+            )}
+          </>
         )}
         {isAdmin && (
           <>
