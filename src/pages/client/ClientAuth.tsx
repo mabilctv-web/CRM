@@ -48,8 +48,9 @@ export default function ClientAuth() {
     setLoginLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setLoginLoading(false)
-    if (error) setLoginError('Неверный email или пароль')
-    else navigate('/my', { replace: true })
+    if (error) { setLoginError('Неверный email или пароль'); return }
+    await supabase.rpc('link_orders_by_email')
+    navigate('/my', { replace: true })
   }
 
   async function handleRegister(e: React.FormEvent) {
@@ -65,7 +66,7 @@ export default function ClientAuth() {
     if (error) {
       setRegError(error.message)
     } else if (data.session) {
-      await supabase.rpc('create_client_profile', { user_name: regName })
+      await supabase.rpc('link_orders_by_email')
       navigate('/my', { replace: true })
     } else {
       setRegSuccess(true)
