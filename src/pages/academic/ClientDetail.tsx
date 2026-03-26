@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, GraduationCap, BookOpen, CalendarCheck, AlertTriangle, Wallet, Edit2, Shield, Library, CalendarDays, Send, CheckCircle2, Bell, BellRing, Activity } from 'lucide-react'
+import { ArrowLeft, GraduationCap, BookOpen, CalendarCheck, AlertTriangle, Wallet, Edit2, Shield, Library, CalendarDays, Send, CheckCircle2, Bell, BellRing, Activity, MessageCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import type { AcademicClient, AcademicSubject } from '../../types/academic'
@@ -13,6 +13,7 @@ import FinancesTab from './tabs/FinancesTab'
 import SubjectsTab from './tabs/SubjectsTab'
 import ScheduleTab from './tabs/ScheduleTab'
 import ActivityLogTab from './tabs/ActivityLogTab'
+import TelegramHistoryTab from './tabs/TelegramHistoryTab'
 import { logActivity } from '../../lib/activityLog'
 import Modal from '../../components/ui/Modal'
 import clsx from 'clsx'
@@ -26,6 +27,7 @@ const TABS = [
   { key: 'mistakes',    label: 'Ошибки',        icon: AlertTriangle },
   { key: 'finances',    label: 'Финансы',       icon: Wallet },
   { key: 'log',         label: 'Лог',           icon: Activity },
+  { key: 'tg',          label: 'Telegram',      icon: MessageCircle, tgOnly: true },
 ]
 
 const emptyForm = { last_name: '', first_name: '', patronymic: '', university: '', faculty: '', year_of_study: '', semester: '', notes: '' }
@@ -245,7 +247,7 @@ export default function ClientDetail() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-navy-800/60 rounded-xl p-1 border border-white/[0.06] overflow-x-auto">
-        {TABS.map(({ key, label, icon: Icon }) => (
+        {TABS.filter(t => !(t as { tgOnly?: boolean }).tgOnly || !!client.telegram_chat_id).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
@@ -293,6 +295,9 @@ export default function ClientDetail() {
         )}
         {activeTab === 'log' && (
           <ActivityLogTab clientId={clientId} />
+        )}
+        {activeTab === 'tg' && client.telegram_chat_id && (
+          <TelegramHistoryTab chatId={client.telegram_chat_id} />
         )}
       </div>
 
