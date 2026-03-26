@@ -60,7 +60,7 @@ export default function ClientAuth() {
     const { data, error } = await supabase.auth.signUp({
       email: regEmail,
       password: regPassword,
-      options: { data: { full_name: regName, role: 'client' } },
+      options: { data: { full_name: regName } },
     })
     if (error) {
       setRegError(error.message)
