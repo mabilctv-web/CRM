@@ -42,8 +42,12 @@ export default function Order() {
     setLoading(true)
 
     try {
-      // Insert order directly (anon insert policy allows this)
-      const { data: orderData, error: orderError } = await supabase.from('orders').insert({
+      // Generate UUID client-side so we don't need to read back the row
+      // (anon users can't SELECT orders due to RLS, but can INSERT)
+      const orderId = crypto.randomUUID()
+
+      const { error: orderError } = await supabase.from('orders').insert({
+        id:              orderId,
         client_email:    form.email.trim(),
         client_telegram: form.telegram.trim() ? form.telegram.trim().replace('@', '') : null,
         subject:         form.subject.trim(),
@@ -53,15 +57,13 @@ export default function Order() {
         source:          'website',
         order_type:      'one_time',
         status:          'new',
-      }).select('id').single()
+      })
 
-      if (orderError || !orderData) {
+      if (orderError) {
         setError('Ошибка при отправке. Попробуйте ещё раз.')
         setLoading(false)
         return
       }
-
-      const orderId = orderData.id
 
       // Upload files to storage (anon upload enabled)
       for (const file of files) {
