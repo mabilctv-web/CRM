@@ -18,6 +18,7 @@ import PaymentContacts from './pages/admin/PaymentContacts'
 import UsersAdmin from './pages/admin/Users'
 import NotificationSettings from './pages/admin/NotificationSettings'
 import AdminNotifications from './pages/admin/AdminNotifications'
+import Reviews from './pages/admin/Reviews'
 import Profile from './pages/Profile'
 import ClientList from './pages/academic/ClientList'
 import ClientDetail from './pages/academic/ClientDetail'
@@ -61,6 +62,7 @@ export default function App() {
                 <Route path="/admin/users" element={<UsersAdmin />} />
                 <Route path="/admin/notifications" element={<NotificationSettings />} />
                 <Route path="/admin/admin-notifications" element={<AdminNotifications />} />
+                <Route path="/admin/reviews" element={<Reviews />} />
               </Route>
             </Route>
           </Route>

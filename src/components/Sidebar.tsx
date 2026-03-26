@@ -16,6 +16,7 @@ import {
   BellRing,
   Tag,
   ShoppingBag,
+  Star,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../contexts/AuthContext'
@@ -30,6 +31,7 @@ const studentAdminNav = [
   { to: '/admin/payment-contacts', icon: CreditCard, label: 'Реквизиты' },
   { to: '/admin/notifications', icon: Bell, label: 'Оповещения' },
   { to: '/admin/admin-notifications', icon: BellRing, label: 'Адм. оповещения' },
+  { to: '/admin/reviews', icon: Star, label: 'Отзывы' },
 ]
 
 interface SidebarProps {
@@ -99,7 +101,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
               <NavItem key={to} to={to} icon={Icon} label={label} collapsed={collapsed} active={location.pathname === to} />
             ))}
             {!collapsed && (
-              <p className="text-[9px] font-semibold text-slate-600 uppercase tracking-widest px-3 pt-3 pb-1">Студенты</p>
+              <p className="text-[9px] font-semibold text-slate-600 uppercase tracking-widest px-3 pt-3 pb-1">Учебные услуги</p>
             )}
             {collapsed && <div className="my-1 mx-2 h-px bg-white/[0.04]" />}
             {studentAdminNav.map(({ to, icon: Icon, label }) => (
