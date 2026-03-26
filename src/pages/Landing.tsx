@@ -48,9 +48,7 @@ export default function Landing() {
     supabase.from('landing_reviews').select('id, author_name, text, stars').eq('visible', true).order('sort_order').then(({ data }) => {
       if (data) setReviews(data as Review[])
     })
-    supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'done').then(({ count }) => {
-      setDoneCount(count ?? 0)
-    })
+    setDoneCount(374)
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {

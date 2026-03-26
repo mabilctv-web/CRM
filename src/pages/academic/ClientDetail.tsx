@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, GraduationCap, BookOpen, CalendarCheck, AlertTriangle, Wallet, Edit2, Shield, Library, CalendarDays, Send, CheckCircle2, Bell, BellRing } from 'lucide-react'
+import { ArrowLeft, GraduationCap, BookOpen, CalendarCheck, AlertTriangle, Wallet, Edit2, Shield, Library, CalendarDays, Send, CheckCircle2, Bell, BellRing, Activity } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import type { AcademicClient, AcademicSubject } from '../../types/academic'
@@ -12,6 +12,8 @@ import MistakesTab from './tabs/MistakesTab'
 import FinancesTab from './tabs/FinancesTab'
 import SubjectsTab from './tabs/SubjectsTab'
 import ScheduleTab from './tabs/ScheduleTab'
+import ActivityLogTab from './tabs/ActivityLogTab'
+import { logActivity } from '../../lib/activityLog'
 import Modal from '../../components/ui/Modal'
 import clsx from 'clsx'
 
@@ -23,6 +25,7 @@ const TABS = [
   { key: 'schedule',    label: 'Расписание',    icon: CalendarDays },
   { key: 'mistakes',    label: 'Ошибки',        icon: AlertTriangle },
   { key: 'finances',    label: 'Финансы',       icon: Wallet },
+  { key: 'log',         label: 'Лог',           icon: Activity },
 ]
 
 const emptyForm = { last_name: '', first_name: '', patronymic: '', university: '', faculty: '', year_of_study: '', semester: '', notes: '' }
@@ -71,6 +74,9 @@ export default function ClientDetail() {
       const { error } = await supabase.functions.invoke('send-reminders', {
         body: { test: true, chat_id: client.telegram_chat_id, client_name: fullName(client) },
       })
+      if (!error) {
+        await logActivity(clientId, 'notification_sent', 'Отправлено тестовое уведомление в Telegram')
+      }
       setTestNotifResult(error ? 'error' : 'success')
     } catch {
       setTestNotifResult('error')
@@ -284,6 +290,9 @@ export default function ClientDetail() {
         )}
         {activeTab === 'finances' && (
           <FinancesTab clientId={clientId} isAdmin={isAdmin} />
+        )}
+        {activeTab === 'log' && (
+          <ActivityLogTab clientId={clientId} />
         )}
       </div>
 

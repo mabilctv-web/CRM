@@ -61,7 +61,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
             exit={{ opacity: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <span className="font-bold text-white text-sm tracking-wide">SupplierCRM</span>
+            <span className="font-bold text-white text-sm tracking-wide">РАБочка</span>
           </motion.div>
         )}
       </div>
