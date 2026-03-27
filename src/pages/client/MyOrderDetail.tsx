@@ -20,7 +20,7 @@ const STATUS: Record<string, { label: string; color: string }> = {
   cancelled: { label: 'Отменена', color: 'bg-red-500/15 text-red-400' },
 }
 
-const TG_USERNAME = 'rrworkp'
+const TG_USERNAME = 'studyDB_bot'
 
 export default function MyOrderDetail() {
   const { id } = useParams<{ id: string }>()
